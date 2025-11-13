@@ -1,0 +1,616 @@
+import React, { useState, useEffect } from "react";
+import axios from "axios";
+
+const Calendar = ({ user }) => {
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [holidays, setHolidays] = useState([]);
+  const [birthdays, setBirthdays] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [showBirthdays, setShowBirthdays] = useState(true); // Toggle for birthdays
+  const isAdmin = user?.role === "Admin";
+  const isManager = user?.role === "Manager";
+
+  const monthNames = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
+
+  // Fetch holidays and birthdays from backend
+  useEffect(() => {
+    fetchData();
+  }, [selectedYear]);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      setError("");
+      
+      // Fetch holidays for the selected year
+      const startDate = `${selectedYear}-01-01`;
+      const endDate = `${selectedYear}-12-31`;
+      
+      const holidaysRes = await axios.get(
+        `${process.env.REACT_APP_BACKEND_URL}/api/holidays/?start=${startDate}&end=${endDate}`
+      );
+      setHolidays(holidaysRes.data);
+
+      // Fetch birthdays based on role
+      if (isAdmin) {
+        // Admin sees all birthdays
+        const usersRes = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/users/`);
+        const users = usersRes.data;
+        const birthdayList = processBirthdays(users);
+        setBirthdays(birthdayList);
+      } else if (isManager) {
+        // Manager sees only their team's birthdays
+        const teamRes = await axios.get(
+          `${process.env.REACT_APP_BACKEND_URL}/api/users/get_employees_by_manager/${encodeURIComponent(user.email)}`
+        );
+        const teamMembers = teamRes.data;
+        const birthdayList = processBirthdays(teamMembers);
+        setBirthdays(birthdayList);
+      } else {
+        // Employee sees no birthdays
+        setBirthdays([]);
+      }
+    } catch (err) {
+      console.error("Error fetching data:", err);
+      setError("Failed to load calendar data");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Helper function to process birthdays
+  const processBirthdays = (users) => {
+    return users
+      .filter(user => user.dateOfBirth)
+      .map(user => {
+        let dobValue = user.dateOfBirth;
+        if (typeof dobValue === "object" && dobValue.$date) {
+          dobValue = dobValue.$date;
+        }
+
+        const dob = new Date(dobValue);
+        if (isNaN(dob.getTime())) return null;
+
+        const month = String(dob.getMonth() + 1).padStart(2, '0');
+        const day = String(dob.getDate()).padStart(2, '0');
+
+        return {
+          date: `${selectedYear}-${month}-${day}`,
+          name: user.name,
+          employeeId: user.employeeId || user._id,
+        };
+      })
+      .filter(Boolean);
+  };
+
+  const getDaysInMonth = (year, month) => {
+    return new Date(year, month + 1, 0).getDate();
+  };
+
+  const getFirstDayOfMonth = (year, month) => {
+    return new Date(year, month, 1).getDay();
+  };
+
+  const isHoliday = (year, month, day) => {
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    return holidays.find(h => h.date === dateStr);
+  };
+
+  const isBirthday = (year, month, day) => {
+    if (!showBirthdays) return null;
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    return birthdays.filter(b => b.date === dateStr);
+  };
+
+  const isToday = (year, month, day) => {
+    const today = new Date();
+    return today.getFullYear() === year && 
+           today.getMonth() === month && 
+           today.getDate() === day;
+  };
+
+  const renderMonth = (monthIndex) => {
+    const daysInMonth = getDaysInMonth(selectedYear, monthIndex);
+    const firstDay = getFirstDayOfMonth(selectedYear, monthIndex);
+    const days = [];
+
+    // Empty cells for days before month starts
+    for (let i = 0; i < firstDay; i++) {
+      days.push(<div key={`empty-${i}`} className="calendar-day empty"></div>);
+    }
+
+    // Days of the month
+    for (let day = 1; day <= daysInMonth; day++) {
+      const holiday = isHoliday(selectedYear, monthIndex, day);
+      const birthdayList = isBirthday(selectedYear, monthIndex, day);
+      const today = isToday(selectedYear, monthIndex, day);
+      
+      // Determine background color based on holiday type
+      let bgColor = "white";
+      let borderColor = "#e5e7eb";
+      let textColor = "#374151";
+      
+      if (today) {
+        bgColor = "#dbeafe";
+        borderColor = "#3b82f6";
+        textColor = "#1e40af";
+      } else if (holiday) {
+        if (holiday.type === "national") {
+          bgColor = "#fee2e2";
+          textColor = "#991b1b";
+          borderColor = "#fecaca";
+        } else if (holiday.type === "optional") {
+          bgColor = "#fef3c7";
+          textColor = "#92400e";
+          borderColor = "#fde68a";
+        } else {
+          bgColor = "#e0f2fe";
+          textColor = "#075985";
+          borderColor = "#bae6fd";
+        }
+      } else if (birthdayList && birthdayList.length > 0) {
+        bgColor = "#fce7f3";
+        textColor = "#831843";
+        borderColor = "#fbcfe8";
+      }
+      
+      // Create title text for tooltip
+      let titleText = "";
+      if (holiday) titleText += `Holiday: ${holiday.name}`;
+      if (birthdayList && birthdayList.length > 0) {
+        if (titleText) titleText += "\n";
+        titleText += "Birthday: " + birthdayList.map(b => b.name).join(", ");
+      }
+      
+      days.push(
+        <div 
+          key={day} 
+          className="calendar-day"
+          style={{
+            background: bgColor,
+            border: today ? "2px solid #3b82f6" : `1px solid ${borderColor}`,
+            fontWeight: today || holiday || (birthdayList && birthdayList.length > 0) ? 600 : 400,
+            color: textColor,
+            position: "relative"
+          }}
+          title={titleText}
+        >
+          {day}
+          {/* Holiday indicator */}
+          {holiday && (
+            <div style={{
+              position: "absolute",
+              bottom: 2,
+              left: "50%",
+              transform: "translateX(-50%)",
+              width: 4,
+              height: 4,
+              borderRadius: "50%",
+              background: holiday.type === "national" ? "#dc2626" : 
+                         holiday.type === "optional" ? "#d97706" : "#0284c7"
+            }}></div>
+          )}
+          {/* Birthday indicator */}
+          {birthdayList && birthdayList.length > 0 && (
+            <div style={{
+              position: "absolute",
+              top: 2,
+              right: 2,
+              fontSize: 10,
+            }}>🎂</div>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div className="calendar-month-container" key={monthIndex}>
+        <div className="calendar-month-header">
+          {monthNames[monthIndex]} {selectedYear}
+        </div>
+        <div className="calendar-month">
+          <div className="calendar-weekdays">
+            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(day => (
+              <div key={day} className="calendar-weekday">{day}</div>
+            ))}
+          </div>
+          <div className="calendar-days">
+            {days}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const nationalHolidays = holidays.filter(h => h.type === "national");
+  const optionalHolidays = holidays.filter(h => h.type === "optional");
+  const companyHolidays = holidays.filter(h => h.type === "company");
+
+  if (loading) {
+    return (
+      <div className="panel" style={{ textAlign: "center", padding: 60 }}>
+        <div style={{ fontSize: 48, marginBottom: 16 }}>⏳</div>
+        <div style={{ fontSize: 18, color: "#6b7280" }}>Loading calendar...</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="panel">
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+        <div>
+          <h3 style={{ margin: 0 }}>Company Calendar {selectedYear}</h3>
+          <p className="muted" style={{ margin: "4px 0 0 0" }}>
+            Organization Holidays & Events
+          </p>
+        </div>
+        
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <button 
+            className="btn ghost" 
+            onClick={() => setSelectedYear(selectedYear - 1)}
+            style={{ padding: "6px 12px" }}
+          >
+            ← {selectedYear - 1}
+          </button>
+          <select 
+            className="input" 
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+            style={{ width: 120, padding: "6px 12px" }}
+          >
+            <option value={2024}>2024</option>
+            <option value={2025}>2025</option>
+            <option value={2026}>2026</option>
+            <option value={2027}>2027</option>
+            <option value={2028}>2028</option>
+          </select>
+          <button 
+            className="btn ghost" 
+            onClick={() => setSelectedYear(selectedYear + 1)}
+            style={{ padding: "6px 12px" }}
+          >
+            {selectedYear + 1} →
+          </button>
+          <button
+            className="btn"
+            onClick={fetchData}
+            style={{ padding: "6px 12px", marginLeft: 8 }}
+            title="Refresh calendar"
+          >
+            🔄 Refresh
+          </button>
+        </div>
+      </div>
+
+      {error && (
+        <div style={{
+          background: "#fef2f2",
+          border: "1px solid #fecaca",
+          color: "#dc2626",
+          padding: 12,
+          borderRadius: 8,
+          marginBottom: 20,
+          fontSize: 14
+        }}>
+          ⚠️ {error}
+        </div>
+      )}
+
+      {/* Legend with Birthday Toggle */}
+      <div style={{ 
+        display: "flex", 
+        gap: 20, 
+        marginBottom: 24, 
+        padding: 16, 
+        background: "#f9fafb", 
+        borderRadius: 8,
+        flexWrap: "wrap",
+        alignItems: "center"
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ width: 16, height: 16, background: "#fee2e2", border: "1px solid #fecaca", borderRadius: 4 }}></div>
+          <span style={{ fontSize: 13 }}>National Holiday ({nationalHolidays.length})</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ width: 16, height: 16, background: "#fef3c7", border: "1px solid #fde68a", borderRadius: 4 }}></div>
+          <span style={{ fontSize: 13 }}>Optional Holiday ({optionalHolidays.length})</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ width: 16, height: 16, background: "#e0f2fe", border: "1px solid #bae6fd", borderRadius: 4 }}></div>
+          <span style={{ fontSize: 13 }}>Company Holiday ({companyHolidays.length})</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ width: 16, height: 16, background: "#dbeafe", border: "2px solid #3b82f6", borderRadius: 4 }}></div>
+          <span style={{ fontSize: 13 }}>Today</span>
+        </div>
+        
+        {/* Birthday Toggle */}
+        {(isAdmin || isManager) && (
+          <div style={{ 
+            marginLeft: "auto", 
+            display: "flex", 
+            alignItems: "center", 
+            gap: 8,
+            padding: "6px 12px",
+            background: showBirthdays ? "#fce7f3" : "white",
+            border: showBirthdays ? "2px solid #fbcfe8" : "2px solid #e5e7eb",
+            borderRadius: 8,
+            cursor: "pointer",
+            transition: "all 0.2s"
+          }}
+          onClick={() => setShowBirthdays(!showBirthdays)}
+          >
+            <input 
+              type="checkbox" 
+              checked={showBirthdays} 
+              onChange={(e) => setShowBirthdays(e.target.checked)}
+              style={{ cursor: "pointer" }}
+            />
+            <span style={{ fontSize: 13, fontWeight: 600 }}>
+              🎂 Show Birthdays ({birthdays.length})
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Calendar Grid */}
+      <div style={{ 
+        display: "grid", 
+        gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", 
+        gap: 20,
+        marginBottom: 30
+      }}>
+        {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(month => renderMonth(month))}
+      </div>
+
+      {/* Holiday List */}
+      <div className="card" style={{ padding: 20, marginBottom: 20 }}>
+        <h4 style={{ marginTop: 0, marginBottom: 16 }}>
+          Holiday List {selectedYear} ({holidays.length} holidays)
+        </h4>
+        
+        {holidays.length > 0 ? (
+          <div style={{ display: "grid", gap: 8 }}>
+            {holidays
+              .sort((a, b) => new Date(a.date) - new Date(b.date))
+              .map((holiday, idx) => {
+                const date = new Date(holiday.date);
+                const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+                const dateStr = date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+                
+                let bgColor, borderColor, badgeColor;
+                if (holiday.type === "national") {
+                  bgColor = "#fef2f2";
+                  borderColor = "#fecaca";
+                  badgeColor = "#dc2626";
+                } else if (holiday.type === "optional") {
+                  bgColor = "#fffbeb";
+                  borderColor = "#fde68a";
+                  badgeColor = "#d97706";
+                } else {
+                  bgColor = "#f0f9ff";
+                  borderColor = "#bae6fd";
+                  badgeColor = "#0284c7";
+                }
+                
+                return (
+                  <div 
+                    key={idx}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      padding: "10px 12px",
+                      background: bgColor,
+                      borderRadius: 6,
+                      border: `1px solid ${borderColor}`
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <div style={{ 
+                        width: 48, 
+                        textAlign: "center",
+                        fontWeight: 600,
+                        fontSize: 13
+                      }}>
+                        <div style={{ color: "#6b7280" }}>{dayName}</div>
+                        <div>{dateStr}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: 14 }}>{holiday.name}</div>
+                        {holiday.description && (
+                          <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
+                            {holiday.description}
+                          </div>
+                        )}
+                        {holiday.region && (
+                          <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>
+                            📍 {holiday.region}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      {holiday.is_optional && (
+                        <span style={{
+                          fontSize: 11,
+                          padding: "3px 8px",
+                          background: "#f3f4f6",
+                          borderRadius: 4,
+                          color: "#6b7280",
+                          fontWeight: 500
+                        }}>
+                          Optional
+                        </span>
+                      )}
+                      <span 
+                        className="badge"
+                        style={{
+                          background: badgeColor,
+                          color: "white",
+                          fontSize: 11,
+                          padding: "4px 10px",
+                          textTransform: "capitalize"
+                        }}
+                      >
+                        {holiday.type}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+        ) : (
+          <div className="muted" style={{ textAlign: "center", padding: 40 }}>
+            <div style={{ fontSize: 48, marginBottom: 12 }}>📅</div>
+            <div>No holidays added for {selectedYear}</div>
+            <div style={{ fontSize: 13, marginTop: 8 }}>
+              Admin can add holidays from the Holidays section
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Birthday List */}
+      {showBirthdays && birthdays.length > 0 && (isAdmin || isManager) && (
+        <div className="card" style={{ padding: 20 }}>
+          <h4 style={{ marginTop: 0, marginBottom: 16 }}>
+            🎂 Employee Birthdays {selectedYear} ({birthdays.length} birthdays)
+          </h4>
+          
+          <div style={{ display: "grid", gap: 8 }}>
+            {birthdays
+              .sort((a, b) => new Date(a.date) - new Date(b.date))
+              .map((birthday, idx) => {
+                const date = new Date(birthday.date);
+                const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+                const dateStr = date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+                
+                return (
+                  <div 
+                    key={idx}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      padding: "10px 12px",
+                      background: "#fef5f7",
+                      borderRadius: 6,
+                      border: "1px solid #fbcfe8"
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <div style={{ fontSize: 24 }}>🎂</div>
+                      <div style={{ 
+                        width: 48, 
+                        textAlign: "center",
+                        fontWeight: 600,
+                        fontSize: 13
+                      }}>
+                        <div style={{ color: "#6b7280" }}>{dayName}</div>
+                        <div>{dateStr}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: 14, color: "#831843" }}>
+                          {birthday.name}
+                        </div>
+                        <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 2 }}>
+                          ID: {birthday.employeeId}
+                        </div>
+                      </div>
+                    </div>
+                    <span 
+                      className="badge"
+                      style={{
+                        background: "#ec4899",
+                        color: "white",
+                        fontSize: 11,
+                        padding: "4px 10px"
+                      }}
+                    >
+                      Birthday
+                    </span>
+                  </div>
+                );
+              })}
+          </div>
+        </div>
+      )}
+
+      <style jsx>{`
+        .calendar-month-container {
+          background: white;
+          border-radius: 8px;
+          overflow: hidden;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .calendar-month-header {
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          color: white;
+          padding: 12px;
+          font-weight: 600;
+          text-align: center;
+          font-size: 14px;
+        }
+
+        .calendar-month {
+          padding: 16px;
+        }
+
+        .calendar-weekdays {
+          display: grid;
+          grid-template-columns: repeat(7, 1fr);
+          gap: 4px;
+          margin-bottom: 8px;
+        }
+
+        .calendar-weekday {
+          text-align: center;
+          font-size: 12px;
+          font-weight: 600;
+          color: #6b7280;
+          padding: 4px 0;
+        }
+
+        .calendar-days {
+          display: grid;
+          grid-template-columns: repeat(7, 1fr);
+          gap: 4px;
+          justify-items: center;
+          align-items: center;
+        }
+
+        .calendar-day {
+          aspect-ratio: 1;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 13px;
+          border-radius: 4px;
+          cursor: pointer;
+          transition: all 0.2s;
+          width: 100%;
+          text-align: center;
+        }
+
+        .calendar-day:not(.empty):hover {
+          transform: scale(1.05);
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .calendar-day.empty {
+          border: none;
+        }
+      `}</style>
+
+    </div>
+  );
+};
+
+export default Calendar;

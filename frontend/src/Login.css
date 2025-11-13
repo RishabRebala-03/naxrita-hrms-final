@@ -1,0 +1,325 @@
+/* =============================================== */
+/* 🎨 JPMC-Inspired Luxury Login (NAXRITA)       */
+/* =============================================== */
+
+/* Import Goldman Sachs / Apple inspired fonts */
+@import url("https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
+
+:root {
+  --black: #000000;
+  --white: #ffffff;
+  --gray: #6b7280;
+  --accent: #0071e3; /* Apple blue */
+  --font-luxury: "DM Serif Display", "Georgia", serif;
+  --font-body: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+}
+
+body,
+html {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-body);
+  background: #f9fafb;
+  color: var(--black);
+}
+
+/* =============================================== */
+/* Layout                                           */
+/* =============================================== */
+
+.login-page {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* ---------- LEFT SIDE (Dark theme) ---------- */
+.login-left.apple-dark {
+  flex: 1;
+  background: var(--black);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: var(--white);
+  padding: 40px;
+}
+
+/* ---------- RIGHT SIDE ---------- */
+.login-right {
+  flex: 1;
+  background: #f9fafb;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 60px;
+}
+
+/* =============================================== */
+/* LEFT SIDE - Luxury Branding                     */
+/* =============================================== */
+
+.apple-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px; /* Reduced from default to close the gap */
+  line-height: 1;
+}
+
+.apple-logo {
+  width: 380px;
+  height: auto;
+  display: block;
+  margin: 0;
+  margin-bottom: -20px; /* Pulls NAXRITA text closer to logo */
+  object-fit: contain;
+  filter: drop-shadow(0 4px 32px rgba(255, 255, 255, 0.15));
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.apple-logo:hover {
+  transform: scale(1.02);
+  filter: drop-shadow(0 8px 48px rgba(255, 255, 255, 0.25));
+}
+
+.apple-title {
+  font-family: var(--font-luxury);
+  font-size: 4.5rem;
+  font-weight: 300;
+  letter-spacing: 8px;
+  text-transform: uppercase;
+  color: #ffffff;
+  margin: 0;
+  line-height: 0.9;
+  background: linear-gradient(180deg, #ffffff 0%, #e5e7eb 50%, #d1d5db 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 2px 24px rgba(255, 255, 255, 0.1);
+}
+
+.apple-subtitle {
+  font-family: var(--font-body);
+  font-weight: 300;
+  font-size: 0.95rem;
+  letter-spacing: 2px;
+  color: rgba(255, 255, 255, 0.65);
+  margin-top: 8px;
+  text-transform: uppercase;
+}
+
+/* =============================================== */
+/* RIGHT SIDE - Elegant Portal                     */
+/* =============================================== */
+
+.portal-header {
+  text-align: center;
+  margin-bottom: 48px;
+  animation: fadeInDown 0.8s ease-out;
+}
+
+.portal-title {
+  font-family: var(--font-luxury);
+  font-size: 2.75rem;
+  font-weight: 400;
+  letter-spacing: 0.5px;
+  color: #111827;
+  margin: 0;
+  background: linear-gradient(135deg, #111827 0%, #374151 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  position: relative;
+  padding-bottom: 20px;
+}
+
+.portal-title::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #3b82f6, transparent);
+}
+
+/* =============================================== */
+/* Login Card - Premium Aesthetic                  */
+/* =============================================== */
+
+.login-card {
+  background: #ffffff;
+  border-radius: 20px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.08), 
+              0 8px 16px rgba(0, 0, 0, 0.04);
+  padding: 56px 64px;
+  width: 100%;
+  max-width: 460px;
+  border: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.login-title {
+  font-family: var(--font-luxury);
+  font-size: 2.25rem;
+  font-weight: 400;
+  margin: 0;
+  color: #111827;
+  letter-spacing: 0.5px;
+}
+
+.login-subtitle {
+  font-family: var(--font-body);
+  color: #6b7280;
+  font-size: 0.95rem;
+  font-weight: 400;
+  margin-top: 8px;
+  letter-spacing: 0.3px;
+}
+
+/* =============================================== */
+/* Elegant Input Fields                            */
+/* =============================================== */
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 18px;
+}
+
+.input-group label {
+  font-family: var(--font-body);
+  font-weight: 500;
+  font-size: 0.875rem;
+  margin-bottom: 8px;
+  color: #374151;
+  letter-spacing: 0.3px;
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.input-group input {
+  font-family: var(--font-body);
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1.5px solid #e5e7eb;
+  font-size: 0.95rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  background: #fafafa;
+}
+
+.input-group input:focus {
+  border-color: #3b82f6;
+  background: #ffffff;
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+}
+
+.input-group input::placeholder {
+  color: #9ca3af;
+  font-weight: 300;
+}
+
+/* =============================================== */
+/* Luxury Button                                   */
+/* =============================================== */
+
+.login-btn {
+  font-family: var(--font-body);
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: var(--white);
+  border: none;
+  padding: 14px 24px;
+  width: 100%;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.login-btn:hover {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+  transform: translateY(-1px);
+}
+
+.login-btn:active {
+  transform: translateY(0);
+}
+
+.login-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* =============================================== */
+/* Error Box & Password Toggle                     */
+/* =============================================== */
+
+.error-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #fee2e2;
+  color: #b91c1c;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  margin-bottom: 16px;
+}
+
+.toggle-password {
+  position: absolute;
+  right: 12px;
+  top: 34px;
+  background: none;
+  border: none;
+  color: #6b7280;
+  font-size: 0.85rem;
+  cursor: pointer;
+  font-family: var(--font-body);
+}
+
+/* =============================================== */
+/* Refined Animations                              */
+/* =============================================== */
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.apple-title {
+  animation: fadeSlideUp 1s ease-out both;
+  animation-delay: 0.2s;
+}
+
+.apple-subtitle {
+  animation: fadeSlideUp 1.2s ease-out both;
+  animation-delay: 0.4s;
+}

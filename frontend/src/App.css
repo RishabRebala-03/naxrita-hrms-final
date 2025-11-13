@@ -1,0 +1,97 @@
+:root{
+  --bg: #f3f6f8;            /* soft light background */
+  --card: #ffffff;          /* card background */
+  --muted: #6b7280;         /* muted text */
+  --accent: #1f6feb;        /* corporate blue */
+  --nav-bg: #ffffff;        /* sidebar */
+  --nav-border: #e6eef9;
+  --shadow: 0 6px 18px rgba(20,30,50,0.06);
+  --glass: rgba(255,255,255,0.7);
+  --text: #0f1724;
+  --success: #10b981;
+  --danger: #ef4444;
+}
+
+/* Reset & base */
+*{box-sizing:border-box}
+html,body,#root{height:100%}
+body{
+  margin:0;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  background: var(--bg);
+  color:var(--text);
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+  font-size:14px;
+}
+
+/* Layout */
+.app-root{display:flex; min-height:100vh}
+.sidebar{
+  width:260px;
+  background:var(--nav-bg);
+  border-right:1px solid var(--nav-border);
+  box-shadow:none;
+  display:flex;
+  flex-direction:column;
+  padding:18px;
+}
+.brand{display:flex; align-items:center; gap:10px; padding-bottom:8px; border-bottom:1px solid #eef6ff}
+.brand h1{margin:0; font-size:18px; color:var(--accent)}
+.sidebar .nav{margin-top:18px; display:flex; flex-direction:column; gap:8px}
+.nav button{
+  display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:8px;
+  background:transparent; border:none; cursor:pointer; text-align:left; color:var(--text); font-weight:500;
+}
+.nav button:hover{background:#f0f6ff; color:var(--accent)}
+.nav button.active{background:linear-gradient(90deg, rgba(31,111,235,0.08), rgba(31,111,235,0.03)); color:var(--accent); box-shadow: var(--shadow)}
+
+.footer {margin-top:auto; padding-top:12px; font-size:12px; color:var(--muted)}
+
+/* Main */
+.main{flex:1; display:flex; flex-direction:column; min-height:100vh}
+.topbar{height:64px; display:flex; align-items:center; justify-content:space-between; padding:0 20px; border-bottom:1px solid rgba(15,23,36,0.04); background:linear-gradient(180deg, rgba(255,255,255,0.6), rgba(255,255,255,0.3))}
+.topbar .left{display:flex; align-items:center; gap:12px}
+.topbar h2{margin:0; font-size:16px}
+.topbar .actions{display:flex; gap:10px; align-items:center}
+
+/* Content */
+.content{padding:24px;}
+
+/* Panels & cards */
+.panel{background:var(--card); border-radius:12px; padding:20px; box-shadow: var(--shadow); margin-bottom:18px}
+.welcome{padding:28px}
+.grid{display:grid; gap:16px}
+.quick-cards{grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); margin-top:12px}
+.card{padding:18px; border-radius:10px; background:linear-gradient(180deg, #fff,#fcfdff); border:1px solid #f0f6ff}
+.card.small{display:flex; flex-direction:column; gap:8px; align-items:flex-start}
+.card-title{font-size:12px; color:var(--muted)}
+.card-value{font-size:20px; font-weight:700; color:var(--text)}
+
+/* Forms */
+.form-grid{display:grid; grid-template-columns: repeat(2, 1fr); gap:12px}
+.input{width:100%; padding:10px 12px; border-radius:8px; border:1px solid #e6eef9; background:#fff}
+.btn{padding:10px 14px; border-radius:8px; border:none; background:var(--accent); color:white; cursor:pointer; font-weight:600}
+.btn.ghost{background:transparent; color:var(--accent); border:1px solid #dbeafe}
+.row{display:flex; gap:12px; align-items:center}
+.muted{color:var(--muted)}
+
+/* Tables / lists */
+.table{width:100%; border-collapse:collapse}
+.table th{ text-align:left; font-size:12px; color:var(--muted); padding:10px 8px; border-bottom:1px solid #f1f5f9}
+.table td{padding:12px 8px; border-bottom:1px solid #fbfdff}
+.actions button{margin-right:8px}
+
+/* Tiny helpers */
+.kv{display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px dashed #f3f6f9; color:var(--muted)}
+.badge{padding:6px 8px; border-radius:999px; font-size:12px; background:#f1f5f9; color:var(--muted)}
+.status-approved{color:var(--success); font-weight:600}
+.status-pending{color:#f59e0b; font-weight:600}
+.status-rejected{color:var(--danger); font-weight:600}
+
+/* Responsive */
+@media (max-width:900px){
+  .sidebar{width:72px; padding:12px}
+  .nav button span{display:none}
+  .form-grid{grid-template-columns:1fr}
+}

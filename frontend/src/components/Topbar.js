@@ -1,0 +1,167 @@
+// src/components/Topbar.js
+import React, { useState } from "react";
+
+const Topbar = ({ user, onLogout, onNavigateToProfile }) => {
+  const [showDropdown, setShowDropdown] = useState(false);
+
+  return (
+    <header className="topbar">
+      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+        <h2 style={{ margin: 0, fontSize: 18, color: "#111827" }}>
+          {user?.role === "Admin" ? "Admin Portal" : user?.role === "Manager" ? "Manager Portal" : "Employee Portal"}
+        </h2>
+      </div>
+
+      <div style={{ position: "relative" }}>
+        <button
+          onClick={() => setShowDropdown(!showDropdown)}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            background: "white",
+            border: "1px solid #e5e7eb",
+            borderRadius: 12,
+            padding: "8px 16px",
+            cursor: "pointer",
+            transition: "all 0.2s ease",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "#f9fafb";
+            e.currentTarget.style.borderColor = "#d1d5db";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "white";
+            e.currentTarget.style.borderColor = "#e5e7eb";
+          }}
+        >
+          <div
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: "50%",
+              background: "linear-gradient(135deg, #667eea, #764ba2)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "white",
+              fontWeight: 700,
+              fontSize: 14,
+            }}
+          >
+            {user?.name?.charAt(0) || "U"}
+          </div>
+          <div style={{ textAlign: "left" }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "#111827" }}>
+              {user?.name}
+            </div>
+            <div style={{ fontSize: 12, color: "#6b7280" }}>
+              {user?.role}
+            </div>
+          </div>
+          <div style={{ fontSize: 12, color: "#9ca3af" }}>
+            {showDropdown ? "▲" : "▼"}
+          </div>
+        </button>
+
+        {showDropdown && (
+          <>
+            {/* Backdrop */}
+            <div
+              style={{
+                position: "fixed",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                zIndex: 999,
+              }}
+              onClick={() => setShowDropdown(false)}
+            />
+            
+            {/* Dropdown Menu */}
+            <div
+              style={{
+                position: "absolute",
+                top: "calc(100% + 8px)",
+                right: 0,
+                background: "white",
+                border: "1px solid #e5e7eb",
+                borderRadius: 12,
+                boxShadow: "0 10px 40px rgba(0,0,0,0.15)",
+                minWidth: 220,
+                zIndex: 1000,
+                overflow: "hidden",
+              }}
+            >
+              <div style={{ padding: "12px 16px", borderBottom: "1px solid #e5e7eb", background: "#f9fafb" }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#111827", marginBottom: 2 }}>
+                  {user?.name}
+                </div>
+                <div style={{ fontSize: 12, color: "#6b7280" }}>
+                  {user?.email}
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  setShowDropdown(false);
+                  onNavigateToProfile();
+                }}
+                style={{
+                  width: "100%",
+                  padding: "12px 16px",
+                  border: "none",
+                  background: "transparent",
+                  textAlign: "left",
+                  cursor: "pointer",
+                  fontSize: 14,
+                  color: "#374151",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  transition: "background 0.2s ease",
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = "#f3f4f6"}
+                onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+              >
+                <span style={{ fontSize: 16 }}>👤</span>
+                <span>My Profile</span>
+              </button>
+
+              <div style={{ height: 1, background: "#e5e7eb" }} />
+
+              <button
+                onClick={() => {
+                  setShowDropdown(false);
+                  onLogout();
+                }}
+                style={{
+                  width: "100%",
+                  padding: "12px 16px",
+                  border: "none",
+                  background: "transparent",
+                  textAlign: "left",
+                  cursor: "pointer",
+                  fontSize: 14,
+                  color: "#ef4444",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  transition: "background 0.2s ease",
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = "#fef2f2"}
+                onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+              >
+                <span style={{ fontSize: 16 }}>🚪</span>
+                <span>Logout</span>
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </header>
+  );
+};
+
+export default Topbar;
