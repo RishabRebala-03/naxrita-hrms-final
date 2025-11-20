@@ -5,7 +5,7 @@ const UserForm = ({ onSaved }) => {
     employeeId: "",
     name:"", email:"", password:"", designation:"", role:"Employee",
     department:"", shiftTimings:"", projects:"", reportsToEmail:"", 
-    dateOfJoining:"", dateOfBirth:"" // NEW FIELD
+    dateOfJoining:"", dateOfBirth:"", workLocation:"", peopleLeadEmail:"" // NEW FIELD
   });
   const [loading, setLoading] = useState(false);
 
@@ -26,9 +26,10 @@ const UserForm = ({ onSaved }) => {
       shiftTimings: form.shiftTimings,
       projects: form.projects ? form.projects.split(",").map(s => s.trim()) : [],
       reportsToEmail: form.reportsToEmail || null,
-      leaveBalance: { sick: 6, sickTotal: 6, planned: 12, plannedTotal: 12, lwp: 0 },
       dateOfJoining: form.dateOfJoining ? new Date(form.dateOfJoining).toISOString() : new Date().toISOString(),
-      dateOfBirth: form.dateOfBirth ? new Date(form.dateOfBirth).toISOString() : null // NEW FIELD
+      dateOfBirth: form.dateOfBirth ? new Date(form.dateOfBirth).toISOString() : null, // NEW FIELD
+      workLocation: form.workLocation || "",  // ← ADD THIS
+      peopleLeadEmail: form.peopleLeadEmail || null  // ← ADD THIS
     };
     
     try {
@@ -234,6 +235,32 @@ const UserForm = ({ onSaved }) => {
               onChange={change} 
             />
           </div>
+
+          <div>
+            <label style={{ fontSize: 12, color: "#6b7280", display: "block", marginBottom: 4 }}>
+              People Lead / HR Manager Email
+            </label>
+            <input 
+              className="input" 
+              name="peopleLeadEmail" 
+              placeholder="hr@company.com" 
+              value={form.peopleLeadEmail} 
+              onChange={change} 
+            />
+          </div>
+
+          <div>
+            <label style={{ fontSize: 12, color: "#6b7280", display: "block", marginBottom: 4 }}>
+              Work Location
+            </label>
+            <input 
+              className="input" 
+              name="workLocation" 
+              placeholder="e.g., Hyderabad Office, Remote, Mumbai HQ" 
+              value={form.workLocation} 
+              onChange={change} 
+            />
+          </div>
         </div>
 
         <div style={{marginTop:14, display:"flex", gap:10}}>
@@ -247,7 +274,7 @@ const UserForm = ({ onSaved }) => {
               employeeId: "",
               name:"", email:"", password:"", designation:"", role:"Employee", 
               department:"", shiftTimings:"", projects:"", reportsToEmail:"", 
-              dateOfJoining:"", dateOfBirth:""
+              dateOfJoining:"", dateOfBirth:"", workLocation:"", peopleLeadEmail:""  // ← ADDED
             })}
           >
             Reset

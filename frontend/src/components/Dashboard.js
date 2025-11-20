@@ -153,6 +153,8 @@ const AdminDashboard = ({ user }) => {
         return { bg: "#d1f4dd", text: "#0a5d2c", border: "#7de3a6" };
       case "Rejected":
         return { bg: "#ffe0e0", text: "#c41e3a", border: "#ffb3b3" };
+      case "Cancelled":
+        return { bg: "#ffe0e0", text: "#c41e3a", border: "#ffb3b3" };
       default:
         return { bg: "#fff4e6", text: "#d97706", border: "#fbbf24" };
     }

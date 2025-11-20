@@ -9,7 +9,7 @@ const AdminHolidays = () => {
   });
 
   const load = async () => {
-    const res = await axios.get("process.env.REACT_APP_BACKEND_URL/api/holidays/");
+    const res = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/holidays/`);
     setItems(res.data);
   };
   useEffect(() => { load(); }, []);
@@ -64,11 +64,6 @@ const AdminHolidays = () => {
           <option value="company">Company</option>
         </select>
         <input className="input" name="region" placeholder="Region (optional)" value={form.region} onChange={change} />
-
-        <label style={{ display:"flex", alignItems:"center", gap:8 }}>
-          <input type="checkbox" name="is_optional" checked={form.is_optional} onChange={change} />
-          Optional holiday
-        </label>
 
         <input className="input" name="description" placeholder="Description (optional)" value={form.description} onChange={change} />
       </div>

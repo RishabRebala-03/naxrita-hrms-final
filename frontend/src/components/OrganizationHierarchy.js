@@ -246,7 +246,7 @@ const OrganizationHierarchy = ({ user, onClose }) => {
     });
   };
 
-  const renderNode = (node, level = 0, isLast = false, prefix = '') => {
+  const renderNode = (node, level = 0) => {
     if (!node) return null;
 
     const nodeId = node._id || node.email;
@@ -256,125 +256,139 @@ const OrganizationHierarchy = ({ user, onClose }) => {
     const isVirtual = node.isVirtual;
 
     return (
-      <div key={nodeId} style={{ marginLeft: level > 0 ? 40 : 0 }}>
+      <div key={nodeId} style={{ 
+        display: 'flex', 
+        flexDirection: 'column', 
+        alignItems: 'center',
+        padding: '10px'
+      }}>
+        {/* Node Card */}
         <div
           style={{
-            display: 'flex',
-            alignItems: 'center',
-            padding: '12px 16px',
-            marginBottom: 8,
+            position: 'relative',
+            minWidth: 220,
+            maxWidth: 260,
             background: isCurrentUser 
               ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
               : isVirtual 
               ? '#f3f4f6'
               : 'white',
             border: isCurrentUser 
-              ? '2px solid #667eea'
-              : '1px solid #e5e7eb',
+              ? '3px solid #667eea'
+              : '2px solid #e5e7eb',
             borderRadius: 12,
+            padding: 16,
             cursor: hasChildren ? 'pointer' : 'default',
-            transition: 'all 0.2s ease',
-            position: 'relative',
+            transition: 'all 0.3s ease',
+            boxShadow: isCurrentUser 
+              ? '0 8px 24px rgba(102, 126, 234, 0.4)'
+              : '0 4px 12px rgba(0,0,0,0.1)',
           }}
           onClick={() => hasChildren && toggleNode(nodeId)}
           onMouseEnter={(e) => {
-            if (!isCurrentUser) {
-              e.currentTarget.style.transform = 'translateX(4px)';
-              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
-            }
+            e.currentTarget.style.transform = 'translateY(-4px)';
+            e.currentTarget.style.boxShadow = isCurrentUser 
+              ? '0 12px 32px rgba(102, 126, 234, 0.5)'
+              : '0 8px 20px rgba(0,0,0,0.15)';
           }}
           onMouseLeave={(e) => {
-            if (!isCurrentUser) {
-              e.currentTarget.style.transform = 'translateX(0)';
-              e.currentTarget.style.boxShadow = 'none';
-            }
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = isCurrentUser 
+              ? '0 8px 24px rgba(102, 126, 234, 0.4)'
+              : '0 4px 12px rgba(0,0,0,0.1)';
           }}
         >
-          {level > 0 && (
-            <div
-              style={{
-                position: 'absolute',
-                left: -20,
-                top: '50%',
-                width: 20,
-                height: 2,
-                background: '#d1d5db',
-              }}
-            />
-          )}
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1 }}>
+          {/* Avatar and Info */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
             <div style={{ position: 'relative' }}>
-              <div
-                style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: '50%',
-                  background: isCurrentUser 
-                    ? 'rgba(255,255,255,0.2)'
-                    : isVirtual
-                    ? '#d1d5db'
-                    : 'linear-gradient(135deg, #667eea, #764ba2)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'white',
-                  fontWeight: 700,
-                  fontSize: 16,
-                  border: isCurrentUser ? '2px solid white' : 'none',
-                }}
-              >
-                {node.name?.charAt(0) || '?'}
-              </div>
+              {!isVirtual && node.photoUrl ? (
+                <img
+                  src={node.photoUrl}
+                  alt=""
+                  style={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: '50%',
+                    objectFit: 'cover',
+                    border: isCurrentUser ? '3px solid white' : '2px solid #e5e7eb',
+                  }}
+                />
+              ) : (
+                <div
+                  style={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: '50%',
+                    background: isCurrentUser 
+                      ? 'rgba(255,255,255,0.3)'
+                      : isVirtual
+                      ? '#d1d5db'
+                      : 'linear-gradient(135deg, #667eea, #764ba2)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'white',
+                    fontWeight: 700,
+                    fontSize: 20,
+                    border: isCurrentUser ? '3px solid white' : 'none',
+                  }}
+                >
+                  {node.name?.charAt(0) || '?'}
+                </div>
+              )}
               {!isVirtual && (
-                <div style={{ position: 'absolute', bottom: -2, right: -2, background: 'white', borderRadius: '50%', padding: 2 }}>
-                  <LeaveStatusDot userId={node._id} size={10} />
+                <div style={{ position: 'absolute', bottom: 0, right: 0, background: 'white', borderRadius: '50%', padding: 3 }}>
+                  <LeaveStatusDot userId={node._id} size={12} />
                 </div>
               )}
             </div>
 
-            <div style={{ flex: 1 }}>
+            {/* Name and Details */}
+            <div style={{ textAlign: 'center', width: '100%' }}>
               <div
                 style={{
                   fontSize: 15,
-                  fontWeight: 600,
+                  fontWeight: 700,
                   color: isCurrentUser ? 'white' : '#111827',
-                  marginBottom: 2,
+                  marginBottom: 4,
+                  wordBreak: 'break-word',
                 }}
               >
                 {node.name}
                 {isCurrentUser && (
-                  <span
+                  <div
                     style={{
-                      marginLeft: 8,
+                      marginTop: 4,
                       padding: '2px 8px',
-                      background: 'rgba(255,255,255,0.2)',
+                      background: 'rgba(255,255,255,0.3)',
                       borderRadius: 6,
-                      fontSize: 11,
-                      fontWeight: 600,
+                      fontSize: 10,
+                      fontWeight: 700,
+                      display: 'inline-block',
                     }}
                   >
                     YOU
-                  </span>
+                  </div>
                 )}
               </div>
               <div
                 style={{
-                  fontSize: 13,
-                  color: isCurrentUser ? 'rgba(255,255,255,0.9)' : '#6b7280',
+                  fontSize: 12,
+                  color: isCurrentUser ? 'rgba(255,255,255,0.95)' : '#6b7280',
+                  marginBottom: 2,
                 }}
               >
                 {node.designation}
                 {node.role && node.role !== 'Employee' && (
-                  <span style={{ marginLeft: 8 }}>• {node.role}</span>
+                  <span style={{ marginLeft: 4 }}>• {node.role}</span>
                 )}
               </div>
               {!isVirtual && (
                 <div
                   style={{
-                    fontSize: 11,
-                    color: isCurrentUser ? 'rgba(255,255,255,0.8)' : '#9ca3af',
-                    marginTop: 2,
+                    fontSize: 10,
+                    color: isCurrentUser ? 'rgba(255,255,255,0.85)' : '#9ca3af',
+                    wordBreak: 'break-all',
                   }}
                 >
                   {node.email}
@@ -382,60 +396,97 @@ const OrganizationHierarchy = ({ user, onClose }) => {
               )}
             </div>
 
+            {/* Expand/Collapse Indicator */}
             {hasChildren && (
               <div
                 style={{
-                  fontSize: 20,
-                  color: isCurrentUser ? 'white' : '#9ca3af',
-                  transition: 'transform 0.2s ease',
-                  transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
-                }}
-              >
-                ▼
-              </div>
-            )}
-
-            {hasChildren && (
-              <div
-                style={{
-                  padding: '4px 10px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  marginTop: 8,
+                  padding: '4px 12px',
                   background: isCurrentUser 
                     ? 'rgba(255,255,255,0.2)'
                     : '#f3f4f6',
                   borderRadius: 6,
-                  fontSize: 12,
+                  fontSize: 11,
                   fontWeight: 600,
                   color: isCurrentUser ? 'white' : '#6b7280',
                 }}
               >
-                {node.children.length} {node.children.length === 1 ? 'report' : 'reports'}
+                <span>{node.children.length} {node.children.length === 1 ? 'report' : 'reports'}</span>
+                <span
+                  style={{
+                    fontSize: 14,
+                    transition: 'transform 0.3s ease',
+                    transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                  }}
+                >
+                  ▼
+                </span>
               </div>
             )}
           </div>
         </div>
 
+        {/* Vertical Connector Line */}
         {hasChildren && isExpanded && (
-          <div style={{ marginLeft: 0, position: 'relative' }}>
-            {level > 0 && (
+          <div
+            style={{
+              width: 2,
+              height: 30,
+              background: '#d1d5db',
+            }}
+          />
+        )}
+
+        {/* Children Container */}
+        {hasChildren && isExpanded && (
+          <div style={{ position: 'relative' }}>
+            {/* Horizontal Line connecting to children */}
+            {node.children.length > 1 && (
               <div
                 style={{
                   position: 'absolute',
-                  left: -20,
                   top: 0,
-                  bottom: 0,
-                  width: 2,
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  width: `${(node.children.length - 1) * 280}px`,
+                  height: 2,
                   background: '#d1d5db',
                 }}
               />
             )}
-            {node.children.map((child, idx) =>
-              renderNode(
-                child,
-                level + 1,
-                idx === node.children.length - 1,
-                prefix + (isLast ? '  ' : '│ ')
-              )
-            )}
+
+            {/* Children Grid */}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'center',
+                gap: 20,
+                flexWrap: 'wrap',
+              }}
+            >
+              {node.children.map((child) => (
+                <div key={child._id} style={{ position: 'relative' }}>
+                  {/* Vertical line from horizontal connector to child */}
+                  {node.children.length > 1 && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: -30,
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        width: 2,
+                        height: 30,
+                        background: '#d1d5db',
+                      }}
+                    />
+                  )}
+                  {renderNode(child, level + 1)}
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>

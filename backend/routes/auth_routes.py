@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from bson import ObjectId
 from config.db import mongo
+import os
 
 auth_bp = Blueprint("auth_bp", __name__)
 
@@ -20,7 +21,7 @@ def login():
         if not user:
             return jsonify({"error": "Invalid email or password"}), 401
 
-        # Check password (plain text comparison - NOT recommended for production)
+        # Check password
         if user.get("password") != password:
             return jsonify({"error": "Invalid email or password"}), 401
 
@@ -28,14 +29,33 @@ def login():
         if email == "admin@firm.com":
             if user.get("role") != "Admin":
                 return jsonify({"error": "Access denied. This account is not an Admin."}), 403
-        else:
-            # If it's not the admin email but trying to access admin dashboard
-            user_role = user.get("role", "Employee")
-            if user_role == "Admin":
-                pass  # allowed — maybe future multiple admins
-            else:
-                # ordinary employee login — fine, but frontend decides where to redirect
-                pass
+
+        # Build photo URL
+        photo_url = None
+        base = request.host_url.rstrip("/")
+        user_id_str = str(user["_id"])
+
+        # Check for photo with various extensions
+        photo_extensions = ['.png', '.jpg', '.jpeg', '.webp']
+        for ext in photo_extensions:
+            photo_filename = f"{user_id_str}{ext}"
+            photo_path = os.path.join("static", "profile_photos", photo_filename)
+            
+            if os.path.exists(photo_path):
+                photo_url = f"{base}/static/profile_photos/{photo_filename}"
+                print(f"✅ Found photo: {photo_url}")
+                break
+
+        if not photo_url and user.get("photoFilename"):
+            # Fallback to photoFilename field if it exists
+            photo_url = f"{base}/static/profile_photos/{user['photoFilename']}"
+        elif not photo_url and user.get("profilePhoto"):
+            # Fallback to profilePhoto field
+            profile_photo = user.get("profilePhoto")
+            if profile_photo.startswith("/static"):
+                photo_url = f"{base}{profile_photo}"
+
+        print(f"🔍 Final photoUrl for {user.get('name')}: {photo_url}")
 
         # Return user info (excluding password)
         user_data = {
@@ -44,7 +64,8 @@ def login():
             "email": user["email"],
             "role": user.get("role", "Employee"),
             "designation": user.get("designation", ""),
-            "department": user.get("department", "")
+            "department": user.get("department", ""),
+            "photoUrl": photo_url   # 👈 ADD THIS
         }
 
         return jsonify({

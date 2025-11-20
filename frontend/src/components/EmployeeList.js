@@ -277,22 +277,36 @@ const downloadCSV = () => {
             >
               <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
                 <div style={{ position: 'relative' }}>
-                  <div
-                    style={{
-                      width: 48,
-                      height: 48,
-                      borderRadius: "50%",
-                      background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      color: "white",
-                      fontWeight: 700,
-                      fontSize: 18,
-                    }}
-                  >
-                    {employee.name?.charAt(0) || "E"}
-                  </div>
+                  {employee.photoUrl ? (
+                    <img
+                      src={employee.photoUrl}
+                      alt=""
+                      style={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: "50%",
+                        objectFit: "cover",
+                        border: "2px solid #e5e7eb",
+                      }}
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: "50%",
+                        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "white",
+                        fontWeight: 700,
+                        fontSize: 18,
+                      }}
+                    >
+                      {employee.name?.charAt(0) || "E"}
+                    </div>
+                  )}
                   <div style={{ position: 'absolute', bottom: -2, right: -2, background: 'white', borderRadius: '50%', padding: 2 }}>
                     <LeaveStatusDot userId={employee._id} size={10} />
                   </div>

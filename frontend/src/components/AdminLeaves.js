@@ -51,6 +51,22 @@ const AdminLeaves = ({ user }) => {
     }
   };
 
+  // 🎂 Check if start_date matches employee birthday
+  const isBirthdayLeave = (leave) => {
+    if (!leave.employee_dateOfBirth) return false;
+    try {
+      const dob = new Date(leave.employee_dateOfBirth);
+      const start = new Date(leave.start_date);
+
+      return (
+        dob.getMonth() === start.getMonth() &&
+        dob.getDate() === start.getDate()
+      );
+    } catch {
+      return false;
+    }
+  };
+
   const handleApprove = (leaveId) => {
     setApproveModal({ show: true, leaveId, approverName: "" });
   };
@@ -277,10 +293,49 @@ const AdminLeaves = ({ user }) => {
                     <div>
                       <div style={{ fontSize: 16, fontWeight: 700, color: "#111827" }}>
                         {leave.employee_name || "Unknown"}
+
+                        {/* 🎂 BIRTHDAY BADGE */}
+                        {isBirthdayLeave(leave) && (
+                          <span
+                            style={{
+                              marginLeft: 8,
+                              background: "#ffe5f0",
+                              color: "#d6336c",
+                              padding: "4px 8px",
+                              borderRadius: 6,
+                              fontSize: 12,
+                              fontWeight: 600,
+                            }}
+                          >
+                            🎂 Birthday Leave
+                          </span>
+                        )}
                       </div>
                       <div style={{ fontSize: 13, color: "#6b7280", marginTop: 2 }}>
                         {leave.employee_designation} • {leave.employee_department}
                       </div>
+                      {leave.employee_dateOfBirth && (() => {
+                        const dob = new Date(leave.employee_dateOfBirth);
+                        const start = new Date(leave.start_date);
+
+                        if (dob.getMonth() === start.getMonth() && dob.getDate() === start.getDate()) {
+                          return (
+                            <span style={{
+                              background: "#ffebc8",
+                              color: "#b45309",
+                              fontSize: "12px",
+                              padding: "3px 8px",
+                              borderRadius: "6px",
+                              display: "inline-block",
+                              marginTop: "6px",
+                              fontWeight: 600
+                            }}>
+                              🎂 Birthday Leave
+                            </span>
+                          );
+                        }
+                        return null;
+                      })()}
                       <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 2, fontFamily: "monospace" }}>
                         {leave.employee_email}
                       </div>

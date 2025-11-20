@@ -4,7 +4,7 @@ import axios from "axios";
 import OrganizationHierarchy from "./OrganizationHierarchy";
 import LeaveStatusDot from './LeaveStatusDot';
 
-const ManagerDashboard = ({ user }) => {
+const ManagerDashboard = ({ user, onNavigateToProfile }) => {
 
   const [stats, setStats] = useState({
     totalTeamMembers: 0,
@@ -163,6 +163,8 @@ const ManagerDashboard = ({ user }) => {
       case "Approved":
         return { bg: "#d1f4dd", text: "#0a5d2c", border: "#7de3a6" };
       case "Rejected":
+        return { bg: "#ffe0e0", text: "#c41e3a", border: "#ffb3b3" };
+      case "Cancelled":
         return { bg: "#ffe0e0", text: "#c41e3a", border: "#ffb3b3" };
       default:
         return { bg: "#fff4e6", text: "#d97706", border: "#fbbf24" };
@@ -626,49 +628,86 @@ const ManagerDashboard = ({ user }) => {
                 </div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                {teamMembers.map((member) => (
-                  <div
-                    key={member._id}
-                    style={{
-                      padding: 16,
-                      background: "#f9fafb",
-                      borderRadius: 10,
-                      border: "1px solid #e5e7eb",
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                      <div style={{ position: 'relative' }}>
-                        <div
-                          style={{
-                            width: 48,
-                            height: 48,
-                            borderRadius: "50%",
-                            background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            color: "white",
-                            fontWeight: 700,
-                            fontSize: 18,
-                          }}
-                        >
-                          {member.name?.charAt(0) || "E"}
+                {teamMembers.map((member) => {
+                  // ✅ CRITICAL FIX: Extract the correct ID
+                  const memberId = typeof member._id === 'string' 
+                    ? member._id 
+                    : (member._id?._id || String(member._id));
+                  
+                  console.log("🔍 Team member ID:", memberId, "Type:", typeof memberId);
+                  
+                  return (
+                    <div
+                      key={memberId}
+                      style={{
+                        padding: 16,
+                        background: "#f9fafb",
+                        borderRadius: 10,
+                        border: "1px solid #e5e7eb",
+                        cursor: "pointer",
+                        transition: "all 0.2s ease",
+                      }}
+                      onClick={() => {
+                        console.log("🖱️ Clicked member:", member.name, "ID:", memberId);
+                        onNavigateToProfile(memberId);
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = "#f3f4f6";
+                        e.currentTarget.style.borderColor = "#667eea";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "#f9fafb";
+                        e.currentTarget.style.borderColor = "#e5e7eb";
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <div style={{ position: 'relative' }}>
+                          {member.photoUrl ? (
+                            <img
+                              src={member.photoUrl}
+                              alt=""
+                              style={{
+                                width: 48,
+                                height: 48,
+                                borderRadius: "50%",
+                                objectFit: "cover",
+                                border: "2px solid #e5e7eb",
+                              }}
+                            />
+                          ) : (
+                            <div
+                              style={{
+                                width: 48,
+                                height: 48,
+                                borderRadius: "50%",
+                                background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                color: "white",
+                                fontWeight: 700,
+                                fontSize: 18,
+                              }}
+                            >
+                              {member.name?.charAt(0) || "E"}
+                            </div>
+                          )}
+                          <div style={{ position: 'absolute', bottom: -2, right: -2, background: 'white', borderRadius: '50%', padding: 2 }}>
+                            <LeaveStatusDot userId={memberId} size={12} />
+                          </div>
                         </div>
-                        <div style={{ position: 'absolute', bottom: -2, right: -2, background: 'white', borderRadius: '50%', padding: 2 }}>
-                          <LeaveStatusDot userId={member._id} size={12} />
-                        </div>
-                      </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 15, fontWeight: 600, color: "#111827" }}>
-                          {member.name}
-                        </div>
-                        <div style={{ fontSize: 13, color: "#6b7280" }}>
-                          {member.designation}
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 15, fontWeight: 600, color: "#111827" }}>
+                            {member.name}
+                          </div>
+                          <div style={{ fontSize: 13, color: "#6b7280" }}>
+                            {member.designation}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
                 </div>
               )}
             </div>

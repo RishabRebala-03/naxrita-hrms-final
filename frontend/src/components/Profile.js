@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 
-const Profile = ({ user, role, viewEmployeeId = null }) => {
+const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
   const [employeeId, setEmployeeId] = useState("");
   const [profile, setProfile] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -73,13 +73,37 @@ const Profile = ({ user, role, viewEmployeeId = null }) => {
   };
 
   const fetchProfile = async (userId) => {
+    // ✅ CRITICAL FIX: Validate userId before making API call
     if (!userId) {
       setMessage("No user ID provided");
       return;
     }
 
+    // ✅ Check if userId is actually a string, not an object
+    if (typeof userId !== "string") {
+      console.error("❌ fetchProfile received non-string userId:", userId);
+      setMessage("Invalid user ID format");
+      return;
+    }
+
+    // ✅ Additional validation: check for "[object Object]" string
+    if (userId === "[object Object]") {
+      console.error("❌ fetchProfile received stringified object");
+      setMessage("Invalid user ID");
+      return;
+    }
+
+    // ✅ MongoDB ObjectId validation (should be 24 hex characters)
+    if (!/^[a-f0-9]{24}$/i.test(userId)) {
+      console.error("❌ Invalid MongoDB ObjectId format:", userId);
+      setMessage("Invalid user ID format");
+      return;
+    }
+
     setLoading(true);
     try {
+      console.log("🔍 Fetching profile for validated ID:", userId);
+      
       const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/users/${userId}`);
 
       if (!res.ok) {
@@ -90,7 +114,9 @@ const Profile = ({ user, role, viewEmployeeId = null }) => {
         return;
       }
 
-      const data = await res.json();  // Make sure this line exists
+      const data = await res.json();
+      console.log("✅ Profile loaded successfully for:", data.name);
+      
       setProfile(data);
       setEditForm({
         name: data.name || "",
@@ -99,28 +125,105 @@ const Profile = ({ user, role, viewEmployeeId = null }) => {
         department: data.department || "",
         shiftTimings: data.shiftTimings || "",
         dateOfJoining: dateToInputFormat(data.dateOfJoining),
-        dateOfBirth: dateToInputFormat(data.dateOfBirth),  // This should work now
-        projects: Array.isArray(data.projects) ? data.projects.join(", ") : "",
+        dateOfBirth: dateToInputFormat(data.dateOfBirth),
+        projects: Array.isArray(data.projects)
+          ? data.projects.join(", ")
+          : "",
         reportsToEmail: data.reportsToEmail || "",
+        workLocation: data.workLocation || "",
+        peopleLeadEmail: data.peopleLeadEmail || "",
       });
       setMessage("");
     } catch (err) {
-      console.error(err);
+      console.error("❌ Error fetching profile:", err);
       setMessage("Failed to fetch profile");
     } finally {
       setLoading(false);
     }
   };
 
-  // Auto-load profile based on context
   useEffect(() => {
+    let targetId = null;
+
+    console.log("📋 Profile useEffect triggered");
+    console.log("   viewEmployeeId:", viewEmployeeId, "Type:", typeof viewEmployeeId);
+    console.log("   user.id:", user?.id, "Type:", typeof user?.id);
+
+    // 1. Determine the Target ID
     if (viewEmployeeId) {
-      setEmployeeId(viewEmployeeId);
-      fetchProfile(viewEmployeeId);
+      // Check if it's an object
+      if (typeof viewEmployeeId === "object" && viewEmployeeId !== null) {
+        console.warn("⚠️ viewEmployeeId is an object!");
+        console.log("   Object keys:", Object.keys(viewEmployeeId));
+        console.log("   Stringified:", JSON.stringify(viewEmployeeId, null, 2));
+        
+        // Try multiple possible ID properties
+        targetId = viewEmployeeId._id || 
+                  viewEmployeeId.id || 
+                  viewEmployeeId.employeeId ||
+                  null;
+        
+        if (targetId && typeof targetId === "object") {
+          console.error("❌ Extracted ID is still an object:", targetId);
+          targetId = String(targetId);
+        }
+        
+        if (targetId) {
+          console.log("✅ Extracted ID from object:", targetId);
+        } else {
+          console.error("❌ Could not extract valid ID from object");
+          setMessage("Invalid employee ID: Cannot extract ID from object");
+          setLoading(false);
+          return;
+        }
+      } else if (typeof viewEmployeeId === "string") {
+        targetId = viewEmployeeId;
+        console.log("✅ Using string ID from viewEmployeeId:", targetId);
+      } else {
+        console.error("❌ viewEmployeeId has unexpected type:", typeof viewEmployeeId);
+        setMessage("Invalid employee ID type: " + typeof viewEmployeeId);
+        setLoading(false);
+        return;
+      }
     } else if (user?.id) {
-      setEmployeeId(user.id);
-      fetchProfile(user.id);
+      // Fallback to logged-in user
+      targetId = user.id;
+      console.log("✅ Using logged-in user ID:", targetId);
+    } else {
+      console.error("❌ No user ID available");
+      setMessage("No user ID available");
+      setLoading(false);
+      return;
     }
+
+    // 2. Validate the extracted ID
+    if (!targetId || typeof targetId !== "string") {
+      console.error("❌ Invalid targetId after extraction:", targetId, "Type:", typeof targetId);
+      setMessage("Invalid employee ID format");
+      setLoading(false);
+      return;
+    }
+
+    // 3. Check for common error patterns
+    if (targetId === "[object Object]" || targetId.includes("[object")) {
+      console.error("❌ targetId contains object reference:", targetId);
+      setMessage("Invalid employee ID: Stringified object detected");
+      setLoading(false);
+      return;
+    }
+
+    // 4. Validate MongoDB ObjectId format (24 hex chars)
+    if (!/^[a-f0-9]{24}$/i.test(targetId)) {
+      console.error("❌ targetId is not a valid MongoDB ObjectId:", targetId);
+      setMessage(`Invalid employee ID format: Expected 24 hex characters, got "${targetId}"`);
+      setLoading(false);
+      return;
+    }
+
+    // 5. All validations passed - fetch profile
+    console.log("✅ All validations passed, fetching profile for:", targetId);
+    setEmployeeId(targetId);
+    fetchProfile(targetId);
   }, [viewEmployeeId, user]);
 
   const handleManualFetch = () => {
@@ -150,6 +253,8 @@ const Profile = ({ user, role, viewEmployeeId = null }) => {
         ? profile.projects.join(", ")
         : "",
       reportsToEmail: profile.reportsToEmail || "",
+      workLocation: profile.workLocation || "",
+      peopleLeadEmail: profile.peopleLeadEmail || "",
     });
     setMessage("");
   };
@@ -168,6 +273,8 @@ const Profile = ({ user, role, viewEmployeeId = null }) => {
           .map((p) => p.trim())
           .filter((p) => p),
         reportsToEmail: editForm.reportsToEmail || "", 
+        workLocation: editForm.workLocation || "",  // ← ADD THIS
+        peopleLeadEmail: editForm.peopleLeadEmail || "", 
       };
 
       if (editForm.dateOfJoining) {
@@ -199,12 +306,22 @@ const Profile = ({ user, role, viewEmployeeId = null }) => {
       const data = await res.json();
 
       if (res.ok) {
-        setMessage("Profile updated successfully ✓");
-        setIsEditing(false);
-        fetchProfile(employeeId);
-        setTimeout(() => setMessage(""), 3000);
+        setMessage("Profile updated ✓");
+        await fetchProfile(employeeId);
+        
+        // Update parent state if this is own profile
+        if (user?.id === employeeId && onUserUpdate) {
+          const updatedUserRes = await fetch(
+            `${process.env.REACT_APP_BACKEND_URL}/api/users/${employeeId}`
+          );
+          const updatedUser = await updatedUserRes.json();
+          onUserUpdate({
+            ...user,
+            photoUrl: updatedUser.photoUrl
+          });
+        }
       } else {
-        setMessage("Error: " + (data.error || "Failed to update"));
+        setMessage("Error: " + data.error);
       }
     } catch (err) {
       console.error(err);
@@ -327,21 +444,20 @@ const Profile = ({ user, role, viewEmployeeId = null }) => {
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-                <div
-                  style={{
-                    width: 80,
-                    height: 80,
-                    borderRadius: "50%",
-                    background: "rgba(255, 255, 255, 0.2)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: 36,
-                    fontWeight: 700,
-                    border: "3px solid rgba(255, 255, 255, 0.3)",
-                  }}
-                >
-                  {profile.name?.charAt(0) || "E"}
+                <div style={{ position: "relative" }}>
+                  <img
+                      src={
+                        profile.photoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.name || 'User')}`
+                      }
+                    alt="Profile"
+                    style={{
+                      width: 80,
+                      height: 80,
+                      borderRadius: "50%",
+                      objectFit: "cover",
+                      border: "3px solid rgba(255, 255, 255, 0.3)"
+                    }}
+                  />
                 </div>
                 <div>
                   <h2 style={{ margin: 0, marginBottom: 8, fontSize: 28 }}>
@@ -353,6 +469,25 @@ const Profile = ({ user, role, viewEmployeeId = null }) => {
                   <div style={{ fontSize: 14, opacity: 0.85 }}>
                     {profile.department || "No Department"}
                   </div>
+                  <br></br>
+                  {profile.workLocation && (
+                    <div style={{ marginTop: 16 }}>
+                      <div
+                        style={{ 
+                          fontSize: 12, 
+                          marginBottom: 4,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.5px",
+                          color: "rgba(255, 255, 255, 0.7)" // Fixes readability
+                        }}
+                      >
+                        Work Location
+                      </div>
+                      <div style={{ fontSize: 15, fontWeight: 500 }}>
+                        {profile.workLocation}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
               <div
@@ -476,6 +611,26 @@ const Profile = ({ user, role, viewEmployeeId = null }) => {
                     <div>{profile.reportsToEmail}</div> 
                   </div>
                   )} 
+                  <br></br>
+                  {/* --- START: ADD THIS MISSING CODE --- */}
+                  {profile.peopleLeadEmail && (
+                    <div style={{ marginTop: 8 }}>
+                      <div className="muted" style={{ fontSize: 12, marginBottom: 4 }}>
+                        People Lead
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span>{profile.peopleLeadEmail}</span>
+                        <button
+                          className="btn ghost"
+                          style={{ padding: "4px 8px", fontSize: 12 }}
+                          onClick={() => copyToClipboard(profile.peopleLeadEmail, "People Lead Email")}
+                        >
+                          Copy
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {/* --- END: ADD THIS MISSING CODE --- */}
                 </div>
                 <br></br>
               </div>
@@ -510,7 +665,7 @@ const Profile = ({ user, role, viewEmployeeId = null }) => {
             <div className="card" style={{ padding: 20 }}>
               <h4 style={{ marginTop: 0, marginBottom: 16 }}>Leave Balance</h4>
               {profile.leaveBalance ? (
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
                   <div>
                     <div className="muted" style={{ fontSize: 12 }}>Sick</div>
                     <div style={{ fontSize: 20, fontWeight: 700, color: "#ef4444" }}>
@@ -521,6 +676,12 @@ const Profile = ({ user, role, viewEmployeeId = null }) => {
                     <div className="muted" style={{ fontSize: 12 }}>Planned</div>
                     <div style={{ fontSize: 20, fontWeight: 700, color: "#3b82f6" }}>
                       {profile.leaveBalance.planned || 0}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="muted" style={{ fontSize: 12 }}>Optional</div>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: "#10b981" }}>
+                      {profile.leaveBalance.optional || 0}
                     </div>
                   </div>
                 </div>
@@ -550,6 +711,59 @@ const Profile = ({ user, role, viewEmployeeId = null }) => {
               )}
             </div>
           )}
+          <br></br>
+          {canEdit && (
+          <>
+            <button
+              className="btn ghost"
+              onClick={() => document.getElementById("uploadPhotoInput").click()}
+              style={{
+                border: "2px solid #667eea",
+                color: "#667eea"
+              }}
+            >
+              📸 Change Photo
+            </button>
+
+            <input
+              type="file"
+              id="uploadPhotoInput"
+              style={{ display: "none" }}
+              accept="image/png,image/jpeg,image/webp"
+              onChange={async (e) => {
+                if (!e.target.files.length) return;
+
+                const file = e.target.files[0];
+
+                // Optional: Size limit check (2 MB)
+                if (file.size > 2 * 1024 * 1024) {
+                  setMessage("Error: File size must be under 2 MB");
+                  return;
+                }
+
+                const formData = new FormData();
+                formData.append("photo", file);
+
+                const res = await fetch(
+                  `${process.env.REACT_APP_BACKEND_URL}/api/users/upload_photo/${employeeId}`,
+                  {
+                    method: "POST",
+                    body: formData
+                  }
+                );
+
+                const data = await res.json();
+
+                if (res.ok) {
+                  setMessage("Profile photo updated ✓");
+                  fetchProfile(employeeId);
+                } else {
+                  setMessage("Error: " + data.error);
+                }
+              }}
+            />
+          </>
+        )}
         </div>
       )}
 
@@ -722,9 +936,40 @@ const Profile = ({ user, role, viewEmployeeId = null }) => {
                 placeholder="Project A, Project B, Project C"
               />
             </div>
+            <div>
+              <label style={{ fontSize: 12, color: "#6b7280", display: "block", marginBottom: 4 }}>
+                Work Location
+              </label>
+              <input
+                className="input"
+                value={editForm.workLocation}
+                onChange={(e) => handleInputChange("workLocation", e.target.value)}
+                placeholder="e.g., Hyderabad Office, Remote"
+              />
+            </div>
+
+            {/* Only show for Admin */}
+            {role === "Admin" && (
+              <>
+                <div>
+                  <label style={{ fontSize: 12, color: "#6b7280", display: "block", marginBottom: 4 }}>
+                    People Lead / HR Manager Email
+                  </label>
+                  <input
+                    className="input"
+                    type="email"
+                    value={editForm.peopleLeadEmail || ""}
+                    onChange={(e) => handleInputChange("peopleLeadEmail", e.target.value)}
+                    placeholder="hr@example.com"
+                  />
+                </div>
+              </>
+            )}
           </div>
 
-          <div>
+          {/* Only show for Admin */}
+          {role === "Admin" && (
+            <div>
               <label style={{ fontSize: 12, color: "#6b7280", display: "block", marginBottom: 4 }}>
                 Manager's Email (Reports To)
               </label>
@@ -735,7 +980,8 @@ const Profile = ({ user, role, viewEmployeeId = null }) => {
                 onChange={(e) => handleInputChange("reportsToEmail", e.target.value)}
                 placeholder="manager@example.com"
               />
-          </div>
+            </div>
+          )}
 
           <br></br>
 

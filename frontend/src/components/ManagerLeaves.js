@@ -114,11 +114,17 @@ const ManagerLeaves = ({ user }) => {
   };
 
   const updateStatus = async (leaveId, status, rejectionReason = "") => {
-    try {
-      const payload = { status };
-      if (status === "Rejected" && rejectionReason.trim()) {
-        payload.rejection_reason = rejectionReason;
-      }
+      try {
+        const payload = { 
+          status,
+          approved_by: user.name || user.email  // ⭐ REQUIRED ⭐
+        };
+
+        if (status === "Rejected" && rejectionReason.trim()) {
+          payload.rejection_reason = rejectionReason;
+        }
+
+
 
       const res = await axios.put(
         `${process.env.REACT_APP_BACKEND_URL}/api/leaves/update_status/${leaveId}`,
@@ -155,6 +161,22 @@ const ManagerLeaves = ({ user }) => {
       });
     } catch {
       return "N/A";
+    }
+  };
+
+  // 🎂 Check if start_date matches employee birthday
+  const isBirthdayLeave = (leave) => {
+    if (!leave.employee_dateOfBirth) return false;
+    try {
+      const dob = new Date(leave.employee_dateOfBirth);
+      const start = new Date(leave.start_date);
+
+      return (
+        dob.getMonth() === start.getMonth() &&
+        dob.getDate() === start.getDate()
+      );
+    } catch {
+      return false;
     }
   };
 
@@ -349,10 +371,49 @@ const ManagerLeaves = ({ user }) => {
                       <div>
                         <div style={{ fontSize: 16, fontWeight: 700, color: "#111827" }}>
                           {leave.employee_name || "Unknown Employee"}
+
+                          {/* 🎂 BIRTHDAY BADGE */}
+                          {isBirthdayLeave(leave) && (
+                            <span
+                              style={{
+                                marginLeft: 8,
+                                background: "#ffe5f0",
+                                color: "#d6336c",
+                                padding: "4px 8px",
+                                borderRadius: 6,
+                                fontSize: 12,
+                                fontWeight: 600,
+                              }}
+                            >
+                              🎂 Birthday Leave
+                            </span>
+                          )}
                         </div>
                         <div style={{ fontSize: 13, color: "#6b7280", marginTop: 2 }}>
                           {leave.employee_designation} • {leave.employee_department}
                         </div>
+                        {leave.employee_dateOfBirth && (() => {
+                          const dob = new Date(leave.employee_dateOfBirth);
+                          const start = new Date(leave.start_date);
+
+                          if (dob.getMonth() === start.getMonth() && dob.getDate() === start.getDate()) {
+                            return (
+                              <span style={{
+                                background: "#ffebc8",
+                                color: "#b45309",
+                                fontSize: "12px",
+                                padding: "3px 8px",
+                                borderRadius: "6px",
+                                display: "inline-block",
+                                marginTop: "6px",
+                                fontWeight: 600
+                              }}>
+                                🎂 Birthday Leave
+                              </span>
+                            );
+                          }
+                          return null;
+                        })()}
                         <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 2, fontFamily: "monospace" }}>
                           {leave.employee_email}
                         </div>
@@ -486,8 +547,11 @@ const ManagerLeaves = ({ user }) => {
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
                 {/* Sick */}
                 <div style={{ background: "rgba(255,255,255,0.2)", padding: 14, borderRadius: 8, border: "1px solid rgba(255,255,255,0.3)" }}>
-                  <div style={{ fontSize: 12, opacity: 0.9, marginBottom: 6 }}>🤒 Sick</div>
-                  <div style={{ fontSize: 28, fontWeight: 700, marginBottom: 4 }}>{myBalance.sick}</div>
+                  <div style={{ fontSize: 12, opacity: 0.9, marginBottom: 6 }}>Sick</div>
+                  {/* UPDATED LINE BELOW */}
+                  <div style={{ fontSize: 28, fontWeight: 700, marginBottom: 4 }}>
+                    {myBalance.sick} <span style={{ fontSize: 14, fontWeight: 400 }}>days</span>
+                  </div>
                   <div style={{ fontSize: 10, opacity: 0.8, borderTop: "1px solid rgba(255,255,255,0.2)", paddingTop: 6 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
                       <span>Total:</span>
@@ -502,16 +566,16 @@ const ManagerLeaves = ({ user }) => {
 
                 {/* Planned */}
                 <div style={{ background: "rgba(255,255,255,0.2)", padding: 14, borderRadius: 8, border: "1px solid rgba(255,255,255,0.3)" }}>
-                  <div style={{ fontSize: 12, opacity: 0.9, marginBottom: 6 }}>🏖️ Planned</div>
-                  <div style={{ fontSize: 28, fontWeight: 700, marginBottom: 4 }}>{myBalance.planned}</div>
+                  <div style={{ fontSize: 12, opacity: 0.9, marginBottom: 6 }}>Planned</div>
+                  <div style={{ fontSize: 28, fontWeight: 700, marginBottom: 4 }}>{myBalance.planned} days</div>
                   <div style={{ fontSize: 10, opacity: 0.8, borderTop: "1px solid rgba(255,255,255,0.2)", paddingTop: 6 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
                       <span>Total:</span>
-                      <strong>{myBalance.plannedTotal || 12}</strong>
+                      <strong>{myBalance.plannedTotal || 12} days</strong>
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between" }}>
                       <span>Used:</span>
-                      <strong>{(myBalance.plannedTotal || 12) - myBalance.planned}</strong>
+                      <strong>{(myBalance.plannedTotal || 12) - myBalance.planned} days</strong>
                     </div>
                   </div>
                 </div>
@@ -519,7 +583,7 @@ const ManagerLeaves = ({ user }) => {
                 {/* LWP */}
                 <div style={{ background: "rgba(255,255,255,0.2)", padding: 14, borderRadius: 8, border: "1px solid rgba(255,255,255,0.3)" }}>
                   <div style={{ fontSize: 12, opacity: 0.9, marginBottom: 6 }}>📋 LWP</div>
-                  <div style={{ fontSize: 28, fontWeight: 700, marginBottom: 4 }}>{myBalance.lwp || 0}</div>
+                  <div style={{ fontSize: 28, fontWeight: 700, marginBottom: 4 }}>{myBalance.lwp || 0} days</div>
                   <div style={{ fontSize: 10, opacity: 0.8, borderTop: "1px solid rgba(255,255,255,0.2)", paddingTop: 6 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
                       <span>Total:</span>
@@ -527,7 +591,7 @@ const ManagerLeaves = ({ user }) => {
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between" }}>
                       <span>Used:</span>
-                      <strong>{myBalance.lwp || 0}</strong>
+                      <strong>{myBalance.lwp || 0} days</strong>
                     </div>
                   </div>
                 </div>

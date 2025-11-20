@@ -34,7 +34,7 @@ body{
   box-shadow:none;
   display:flex;
   flex-direction:column;
-  padding:18px;
+  padding: 10px 16px;  
 }
 .brand{display:flex; align-items:center; gap:10px; padding-bottom:8px; border-bottom:1px solid #eef6ff}
 .brand h1{margin:0; font-size:18px; color:var(--accent)}
@@ -42,6 +42,14 @@ body{
 .nav button{
   display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:8px;
   background:transparent; border:none; cursor:pointer; text-align:left; color:var(--text); font-weight:500;
+}
+.brand {
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 1px 0 1px !important;  /* tighten logo area */
+  gap: 4px !important;
+  border-bottom: 1px solid #eef6ff;
 }
 .nav button:hover{background:#f0f6ff; color:var(--accent)}
 .nav button.active{background:linear-gradient(90deg, rgba(31,111,235,0.08), rgba(31,111,235,0.03)); color:var(--accent); box-shadow: var(--shadow)}

@@ -44,6 +44,36 @@ const EmployeeLeaves = ({ user }) => {
     }
   }, [user]);
 
+  // ADD THIS NEW FUNCTION to check if selected date is birthday
+  const isBirthdayDate = (dateStr) => {
+    if (!dateStr || !user?.dateOfBirth) return false;
+    
+    try {
+      let dob = user.dateOfBirth;
+      if (typeof dob === "object" && dob.$date) {
+        dob = new Date(dob.$date);
+      } else {
+        dob = new Date(dob);
+      }
+      
+      const selectedDate = new Date(dateStr);
+      
+      return (
+        dob.getMonth() === selectedDate.getMonth() &&
+        dob.getDate() === selectedDate.getDate()
+      );
+    } catch (err) {
+      return false;
+    }
+  };
+
+  const showBirthdayIndicator = leave.leave_type === "Optional" && 
+                                 leave.start_date && 
+                                 leave.end_date &&
+                                 leave.start_date === leave.end_date &&
+                                 isBirthdayDate(leave.start_date);
+
+
   const applyLeave = async () => {
     if (!leave.start_date || !leave.end_date) {
       setMessage("Please select start and end dates");
@@ -141,11 +171,40 @@ const EmployeeLeaves = ({ user }) => {
     }
   };
 
+  const cancelLeave = async (leaveId) => {
+  if (!window.confirm("Are you sure you want to cancel this leave?")) return;
+
+  try {
+    setLoading(true);
+
+    const res = await axios.put(
+      `${process.env.REACT_APP_BACKEND_URL}/api/leaves/cancel/${leaveId}`
+    );
+
+    if (res.status === 200) {
+      setMessage("Leave cancelled successfully ✓");
+      fetchData();
+      setTimeout(() => setMessage(""), 3000);
+    }
+  } catch (err) {
+    console.error(err);
+    setMessage(
+      "Error: " + (err.response?.data?.error || "Failed to cancel leave")
+    );
+    setTimeout(() => setMessage(""), 3000);
+  } finally {
+    setLoading(false);
+  }
+};
+
+
   const getStatusColor = (status) => {
     switch (status) {
       case "Approved":
         return { bg: "#d1f4dd", text: "#0a5d2c", border: "#7de3a6" };
       case "Rejected":
+        return { bg: "#ffe0e0", text: "#c41e3a", border: "#ffb3b3" };
+      case "Cancelled":
         return { bg: "#ffe0e0", text: "#c41e3a", border: "#ffb3b3" };
       default:
         return { bg: "#fff4e6", text: "#d97706", border: "#fbbf24" };
@@ -153,7 +212,7 @@ const EmployeeLeaves = ({ user }) => {
   };
 
   const totalBalance = balance
-    ? balance.sick + balance.planned
+    ? (balance.sick || 0) + (balance.planned || 0) + (balance.optional || 0)
     : 0;
 
   return (
@@ -186,15 +245,15 @@ const EmployeeLeaves = ({ user }) => {
             {/* Sick */}
             <div style={{ background: "rgba(255, 255, 255, 0.2)", padding: 14, borderRadius: 8, border: "1px solid rgba(255, 255, 255, 0.3)" }}>
               <div style={{ fontSize: 12, opacity: 0.9, marginBottom: 6 }}>🤒 Sick</div>
-              <div style={{ fontSize: 28, fontWeight: 700, marginBottom: 4 }}>{balance.sick}</div>
+              <div style={{ fontSize: 28, fontWeight: 700, marginBottom: 4 }}>{balance.sick} days</div>
               <div style={{ fontSize: 10, opacity: 0.8, borderTop: "1px solid rgba(255, 255, 255, 0.2)", paddingTop: 6 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
                   <span>Total:</span>
-                  <strong>{balance.sickTotal || 6}</strong>
+                  <strong>{balance.sickTotal || 6} days</strong>
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between" }}>
                   <span>Used:</span>
-                  <strong>{(balance.sickTotal || 6) - balance.sick}</strong>
+                  <strong>{(balance.sickTotal || 6) - balance.sick} days</strong>
                 </div>
               </div>
             </div>
@@ -202,23 +261,39 @@ const EmployeeLeaves = ({ user }) => {
             {/* Planned */}
             <div style={{ background: "rgba(255, 255, 255, 0.2)", padding: 14, borderRadius: 8, border: "1px solid rgba(255, 255, 255, 0.3)" }}>
               <div style={{ fontSize: 12, opacity: 0.9, marginBottom: 6 }}>📅 Planned</div>
-              <div style={{ fontSize: 28, fontWeight: 700, marginBottom: 4 }}>{balance.planned}</div>
+              <div style={{ fontSize: 28, fontWeight: 700, marginBottom: 4 }}>{balance.planned} days</div>
               <div style={{ fontSize: 10, opacity: 0.8, borderTop: "1px solid rgba(255, 255, 255, 0.2)", paddingTop: 6 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
                   <span>Total:</span>
-                  <strong>{balance.plannedTotal || 12}</strong>
+                  <strong>{balance.plannedTotal || 12} days</strong>
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between" }}>
                   <span>Used:</span>
-                  <strong>{(balance.plannedTotal || 12) - balance.planned}</strong>
+                  <strong>{(balance.plannedTotal || 12) - balance.planned} days</strong>
+                </div>
+              </div>
+            </div>
+
+            {/* Optional Holiday */}
+            <div style={{ background: "rgba(255,255,255,0.2)", padding: 14, borderRadius: 8, border: "1px solid rgba(255,255,255,0.3)" }}>
+              <div style={{ fontSize: 12, opacity: 0.9, marginBottom: 6 }}>Optional</div>
+              <div style={{ fontSize: 28, fontWeight: 700, marginBottom: 4 }}>{balance.optional || 0} days</div>
+              <div style={{ fontSize: 10, opacity: 0.8, borderTop: "1px solid rgba(255,255,255,0.2)", paddingTop: 6 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
+                  <span>Total:</span>
+                  <strong>{balance.optionalTotal || 2} days</strong>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span>Used:</span>
+                  <strong>{(balance.optionalTotal || 2) - (balance.optional || 0)} days</strong>
                 </div>
               </div>
             </div>
 
             {/* LWP */}
             <div style={{ background: "rgba(255, 255, 255, 0.2)", padding: 14, borderRadius: 8, border: "1px solid rgba(255, 255, 255, 0.3)" }}>
-              <div style={{ fontSize: 12, opacity: 0.9, marginBottom: 6 }}>📋 LWP</div>
-              <div style={{ fontSize: 28, fontWeight: 700, marginBottom: 4 }}>{balance.lwp}</div>
+              <div style={{ fontSize: 12, opacity: 0.9, marginBottom: 6 }}>📋 LOP</div>
+              <div style={{ fontSize: 28, fontWeight: 700, marginBottom: 4 }}>{balance.lwp} days</div>
               <div style={{ fontSize: 10, opacity: 0.8, borderTop: "1px solid rgba(255, 255, 255, 0.2)", paddingTop: 6 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
                   <span>Total:</span>
@@ -226,13 +301,32 @@ const EmployeeLeaves = ({ user }) => {
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between" }}>
                   <span>Used:</span>
-                  <strong>{balance.lwp}</strong>
+                  <strong>{balance.lwp} days</strong>
                 </div>
               </div>
             </div>
           </div>
         )}
       </div>
+
+      {/* 👇👇👇 ADD THIS NEW SECTION BELOW 👇👇👇 */}
+      <div style={{
+        background: "#eff6ff",
+        padding: 16,
+        borderRadius: 12,
+        marginBottom: 24,
+        border: "1px solid #bfdbfe"
+      }}>
+        <div style={{ fontSize: 13, color: "#1e40af", marginBottom: 8, fontWeight: 600 }}>
+          📊 Leave Accrual Information
+        </div>
+        <div style={{ fontSize: 12, color: "#3b82f6", lineHeight: 1.6 }}>
+          • <strong>Planned Leave:</strong> 1 day credited every month<br/>
+          • <strong>Sick Leave:</strong> 0.5 days credited every month<br/>
+          • Accrual starts from your joining date ({balance?.monthsEmployed || 0} months employed)
+        </div>
+      </div>
+      {/* 👆👆👆 NEW SECTION ENDS HERE 👆👆👆 */}
 
       {/* Apply Leave Section */}
       <div
@@ -257,6 +351,7 @@ const EmployeeLeaves = ({ user }) => {
             >
               <option>Sick</option>
               <option>Planned</option>
+              <option>Optional</option>
               <option>LWP</option>
             </select>
           </div>
@@ -461,14 +556,19 @@ const EmployeeLeaves = ({ user }) => {
                             {h.status}
                           </div>
                           {isPending && (
+                          <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+
+                            {/* EDIT BUTTON */}
                             <button
-                              onClick={() => setEditingLeave({
-                                _id: h._id,
-                                leave_type: h.leave_type,
-                                start_date: h.start_date,
-                                end_date: h.end_date,
-                                reason: h.reason || "",
-                              })}
+                              onClick={() =>
+                                setEditingLeave({
+                                  _id: h._id,
+                                  leave_type: h.leave_type,
+                                  start_date: h.start_date,
+                                  end_date: h.end_date,
+                                  reason: h.reason || "",
+                                })
+                              }
                               style={{
                                 background: "#3b82f6",
                                 color: "white",
@@ -482,7 +582,25 @@ const EmployeeLeaves = ({ user }) => {
                             >
                               ✏️ Edit
                             </button>
-                          )}
+
+                            {/* CANCEL BUTTON */}
+                            <button
+                              onClick={() => cancelLeave(h._id)}
+                              style={{
+                                background: "#ef4444",
+                                color: "white",
+                                border: "none",
+                                padding: "6px 12px",
+                                borderRadius: 6,
+                                fontSize: 12,
+                                fontWeight: 600,
+                                cursor: "pointer",
+                              }}
+                            >
+                              ❌ Cancel
+                            </button>
+                          </div>
+                        )}
                           <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>
                             Applied: {formatDate(h.applied_on)}
                           </div>

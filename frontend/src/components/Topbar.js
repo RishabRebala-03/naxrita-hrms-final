@@ -1,17 +1,24 @@
 // src/components/Topbar.js
 import React, { useState } from "react";
+import UniversalSearch from "./UniversalSearch";  // 👈 ADD THIS IMPORT
 
 const Topbar = ({ user, onLogout, onNavigateToProfile }) => {
+  console.log("🔍 Topbar user data:", user);
   const [showDropdown, setShowDropdown] = useState(false);
 
   return (
     <header className="topbar">
-      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+      {/* LEFT SIDE - Title + Search */}
+      <div style={{ display: "flex", alignItems: "center", gap: 20, flex: 1 }}>
         <h2 style={{ margin: 0, fontSize: 18, color: "#111827" }}>
           {user?.role === "Admin" ? "Admin Portal" : user?.role === "Manager" ? "Manager Portal" : "Employee Portal"}
         </h2>
+        
+        {/* 👇 ADD UNIVERSAL SEARCH HERE */}
+        <UniversalSearch currentUser={user} />
       </div>
 
+      {/* RIGHT SIDE - User Dropdown (existing code) */}
       <div style={{ position: "relative" }}>
         <button
           onClick={() => setShowDropdown(!showDropdown)}
@@ -35,22 +42,36 @@ const Topbar = ({ user, onLogout, onNavigateToProfile }) => {
             e.currentTarget.style.borderColor = "#e5e7eb";
           }}
         >
-          <div
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: "50%",
-              background: "linear-gradient(135deg, #667eea, #764ba2)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "white",
-              fontWeight: 700,
-              fontSize: 14,
-            }}
-          >
-            {user?.name?.charAt(0) || "U"}
-          </div>
+          {user?.photoUrl ? (
+            <img
+              src={user.photoUrl}
+              alt="profile"
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: "50%",
+                objectFit: "cover",
+                border: "2px solid #e5e7eb",
+              }}
+            />
+          ) : (
+            <div
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: "50%",
+                background: "linear-gradient(135deg, #667eea, #764ba2)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "white",
+                fontWeight: 700,
+                fontSize: 14,
+              }}
+            >
+              {user?.name?.charAt(0) || "U"}
+            </div>
+          )}
           <div style={{ textAlign: "left" }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: "#111827" }}>
               {user?.name}
@@ -106,7 +127,9 @@ const Topbar = ({ user, onLogout, onNavigateToProfile }) => {
               <button
                 onClick={() => {
                   setShowDropdown(false);
-                  onNavigateToProfile();
+                  const userId = user._id || user.id;
+                  console.log("🔍 Topbar navigating with ID:", userId);
+                  onNavigateToProfile(user.id || user._id);
                 }}
                 style={{
                   width: "100%",

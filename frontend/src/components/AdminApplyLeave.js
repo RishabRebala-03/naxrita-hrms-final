@@ -22,7 +22,7 @@ const AdminApplyLeave = ({ user }) => {
 
   const fetchEmployees = async () => {
     try {
-      const res = await axios.get(`process.env.REACT_APP_BACKEND_URL/api/users/`);
+      const res = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/users/get_all_employees`)
       setEmployees(res.data);
     } catch (err) {
       console.error("Error fetching employees:", err);

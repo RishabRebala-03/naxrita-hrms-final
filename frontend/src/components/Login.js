@@ -29,7 +29,10 @@ const Login = ({ onLoginSuccess }) => {
       const data = await response.json();
 
       if (response.ok) {
-        onLoginSuccess(data.user);
+        onLoginSuccess({
+          ...data.user,
+          photoUrl: data.user?.photoUrl || null,   
+        });
       } else {
         setError(data.error || "Invalid credentials");
       }
