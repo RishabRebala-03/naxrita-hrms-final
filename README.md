@@ -5,7 +5,6 @@ A simple Human Resource Management System built using **React (Frontend)** and *
 ## Features
 - Employee management  
 - Leave application and approval  
-- Optional leave with birthday auto-validation  
 - Universal employee search  
 - Manager and admin dashboards  
 
