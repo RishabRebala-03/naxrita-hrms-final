@@ -225,7 +225,7 @@ const UserForm = ({ onSaved }) => {
 
           <div>
             <label style={{ fontSize: 12, color: "#6b7280", display: "block", marginBottom: 4 }}>
-              Reports To (Manager Email)
+              Tech Lead (Manager Email)
             </label>
             <input 
               className="input" 

@@ -106,7 +106,7 @@ const UniversalSearch = ({ currentUser }) => {
         <div style={{ position: "relative" }}>
           <input
             type="text"
-            placeholder="🔍 Search colleagues..."
+            placeholder="🔍 Search organization..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             onFocus={() => searchTerm && setShowResults(true)}
@@ -406,7 +406,7 @@ const UniversalSearch = ({ currentUser }) => {
                 {managerInfo ? (
                   <div>
                     <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 8, fontWeight: 500 }}>
-                      👤 Reports To
+                      Tech Lead
                     </div>
                     <div
                       style={{
@@ -469,7 +469,7 @@ const UniversalSearch = ({ currentUser }) => {
                 ) : selectedProfile.reportsToEmail ? (
                   <div>
                     <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 4, fontWeight: 500 }}>
-                      👤 Reports To
+                      Tech Lead
                     </div>
                     <div style={{ fontSize: 14, color: "#111827" }}>
                       {selectedProfile.reportsToEmail}
@@ -481,7 +481,7 @@ const UniversalSearch = ({ currentUser }) => {
                 {peopleLeadInfo ? (
                   <div>
                     <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 8, fontWeight: 500 }}>
-                      👥 People Lead / HR Manager
+                      People Lead
                     </div>
                     <div
                       style={{
@@ -544,7 +544,7 @@ const UniversalSearch = ({ currentUser }) => {
                 ) : selectedProfile.peopleLeadEmail ? (
                   <div>
                     <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 4, fontWeight: 500 }}>
-                      👥 People Lead
+                      People Lead
                     </div>
                     <div style={{ fontSize: 14, color: "#111827" }}>
                       {selectedProfile.peopleLeadEmail}
