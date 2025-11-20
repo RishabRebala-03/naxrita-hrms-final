@@ -131,7 +131,7 @@ const EmployeeDashboard = ({ user, setSection }) => {
   };
 
   const totalBalance = leaveBalance 
-    ? leaveBalance.sick + leaveBalance.planned 
+    ? leaveBalance.sick + leaveBalance.planned + (leaveBalance.optional || 0)
     : 0;
 
   return (
@@ -391,14 +391,14 @@ const EmployeeDashboard = ({ user, setSection }) => {
                     </div>
                   </div>
 
-                  {/* LWP Card */}
+                  {/* Optional Leave Card */}
                   <div
                     style={{
                       background: "white",
                       borderRadius: 16,
                       padding: "24px",
                       boxShadow: "0 4px 20px rgba(0, 0, 0, 0.08)",
-                      border: "2px solid #fcd34d",
+                      border: "2px solid #a78bfa",
                       position: "relative",
                       overflow: "hidden",
                     }}
@@ -411,33 +411,33 @@ const EmployeeDashboard = ({ user, setSection }) => {
                         width: 100,
                         height: 100,
                         borderRadius: "50%",
-                        background: "linear-gradient(135deg, #f59e0b, #d97706)",
+                        background: "linear-gradient(135deg, #8b5cf6, #7c3aed)",
                         opacity: 0.1,
                       }}
                     />
-                    <div style={{ fontSize: 40, marginBottom: 12 }}>📋</div>
+                    <div style={{ fontSize: 40, marginBottom: 12 }}>🎉</div>
                     <div style={{ fontSize: 14, color: "#6b7280", marginBottom: 4, fontWeight: 500 }}>
-                      Loss of Pay
+                      Optional Leave
                     </div>
-                    <div style={{ fontSize: 40, fontWeight: 700, color: "#f59e0b", marginBottom: 8 }}>
-                      {leaveBalance.lwp || 0}
+                    <div style={{ fontSize: 40, fontWeight: 700, color: "#8b5cf6", marginBottom: 8 }}>
+                      {leaveBalance.optional || 0}
                     </div>
                     <div style={{ 
                       padding: "8px 12px", 
-                      background: "#fffbeb", 
+                      background: "#f5f3ff", 
                       borderRadius: 8,
-                      border: "1px solid #fcd34d"
+                      border: "1px solid #a78bfa"
                     }}>
-                      <div style={{ fontSize: 11, color: "#92400e", display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+                      <div style={{ fontSize: 11, color: "#5b21b6", display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
                         <span>Total Allocated</span>
-                        <strong>∞</strong>
+                        <strong>{leaveBalance.optionalTotal || 2}</strong>
                       </div>
-                      <div style={{ fontSize: 11, color: "#92400e", display: "flex", justifyContent: "space-between" }}>
-                        <span>Used</span>
-                        <strong>{leaveBalance.lwp || 0}</strong>
+                      <div style={{ fontSize: 11, color: "#5b21b6", display: "flex", justifyContent: "space-between" }}>
+                        <span>Booked/Used</span>
+                        <strong>{(leaveBalance.optionalTotal || 2) - (leaveBalance.optional || 0)}</strong>
                       </div>
+                    </div>
                   </div>
-                </div>
               </>
             )}
           </div>

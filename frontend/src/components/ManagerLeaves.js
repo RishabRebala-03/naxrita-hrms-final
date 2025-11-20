@@ -228,7 +228,7 @@ const ManagerLeaves = ({ user }) => {
   const displayLeaves = getFilteredAndSortedLeaves(pendingLeaves);
 
   const totalMyBalance = myBalance
-    ? (myBalance.sick || 0) + (myBalance.planned || 0)
+    ? (myBalance.sick || 0) + (myBalance.planned || 0) + (myBalance.optional || 0)
     : 0;
 
   return (
@@ -580,6 +580,24 @@ const ManagerLeaves = ({ user }) => {
                   </div>
                 </div>
 
+                {/* Optional */}
+                <div style={{ background: "rgba(255,255,255,0.2)", padding: 14, borderRadius: 8, border: "1px solid rgba(255,255,255,0.3)" }}>
+                  <div style={{ fontSize: 12, opacity: 0.9, marginBottom: 6 }}>Optional</div>
+                  <div style={{ fontSize: 28, fontWeight: 700, marginBottom: 4 }}>
+                    {myBalance.optional || 0} days
+                  </div>
+                  <div style={{ fontSize: 10, opacity: 0.8, borderTop: "1px solid rgba(255,255,255,0.2)", paddingTop: 6 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
+                      <span>Total:</span>
+                      <strong>{myBalance.optionalTotal || 2}</strong>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span>Used:</span>
+                      <strong>{(myBalance.optionalTotal || 2) - (myBalance.optional || 0)}</strong>
+                    </div>
+                  </div>
+                </div>
+
                 {/* LWP */}
                 <div style={{ background: "rgba(255,255,255,0.2)", padding: 14, borderRadius: 8, border: "1px solid rgba(255,255,255,0.3)" }}>
                   <div style={{ fontSize: 12, opacity: 0.9, marginBottom: 6 }}>📋 LWP</div>
@@ -848,6 +866,24 @@ const ManagerLeaves = ({ user }) => {
                             <div style={{ display: "flex", justifyContent: "space-between" }}>
                               <span>Used:</span>
                               <strong>{(member.leaveBalance.plannedTotal || 12) - (member.leaveBalance.planned || 0)}</strong>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Optional - NEW CARD */}
+                        <div style={{ background: "#f5f3ff", padding: 10, borderRadius: 6, border: "1px solid #c4b5fd" }}>
+                          <div style={{ fontSize: 10, color: "#5b21b6", marginBottom: 4 }}>🎉 Optional</div>
+                          <div style={{ fontSize: 18, fontWeight: 700, color: "#8b5cf6", marginBottom: 2 }}>
+                            {member.leaveBalance.optional || 0}
+                          </div>
+                          <div style={{ fontSize: 9, color: "#5b21b6", borderTop: "1px solid #c4b5fd", paddingTop: 4 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
+                              <span>Total:</span>
+                              <strong>{member.leaveBalance.optionalTotal || 2}</strong>
+                            </div>
+                            <div style={{ display: "flex", justifyContent: "space-between" }}>
+                              <span>Used:</span>
+                              <strong>{(member.leaveBalance.optionalTotal || 2) - (member.leaveBalance.optional || 0)}</strong>
                             </div>
                           </div>
                         </div>
