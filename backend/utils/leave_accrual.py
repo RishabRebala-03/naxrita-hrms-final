@@ -22,6 +22,25 @@ def accrue_monthly_leaves():
             if last_accrual and isinstance(last_accrual, datetime):
                 if last_accrual.year == today.year and last_accrual.month == today.month:
                     continue
+
+            # 🔹 NEW: Fortnight rule – only credit if joined on or before 15th
+            join_date = employee.get("dateOfJoining")
+            if not join_date:
+                # No joining date → skip crediting to be safe
+                print(f"⏭️ Skipping {employee.get('name')} – no dateOfJoining")
+                continue
+
+            if isinstance(join_date, str):
+                try:
+                    join_date = datetime.fromisoformat(join_date.replace("Z", "+00:00"))
+                except Exception:
+                    print(f"⏭️ Skipping {employee.get('name')} – invalid dateOfJoining format")
+                    continue
+
+            if join_date.day > 15:
+                print(f"⏭️ Skipping {employee.get('name')} – joined after 15th")
+                continue
+            # 🔹 END fortnight check
             
             # Credit new leaves
             leave_balance["planned"] = leave_balance.get("planned", 0) + 1.0
@@ -29,6 +48,7 @@ def accrue_monthly_leaves():
             leave_balance["sick"] = leave_balance.get("sick", 0) + 0.5
             leave_balance["sickTotal"] = leave_balance.get("sickTotal", 0) + 0.5
             leave_balance["lastAccrualDate"] = first_of_month
+
             
             # Update employee
             mongo.db.users.update_one(

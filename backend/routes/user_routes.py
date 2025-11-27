@@ -87,9 +87,16 @@ def add_user():
         today = datetime.utcnow()
         months_employed = (today.year - join_dt.year) * 12 + (today.month - join_dt.month) + 1
 
+        # 🔹 NEW: Fortnight rule – if joined after 15th, don't count joining month
+        if join_dt.day > 15:
+            months_employed -= 1
+            if months_employed < 0:
+                months_employed = 0
+
         # Accrual rates: 1 planned per month, 0.5 sick per month
         planned_balance = months_employed * 1.0
         sick_balance = months_employed * 0.5
+
 
         data["leaveBalance"] = {
             "sick": sick_balance,
@@ -113,9 +120,6 @@ def add_user():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
-# -------------------------------
-# Get All Users (Read)
-# -------------------------------
 # -------------------------------
 # Get All Users (Read)
 # -------------------------------
@@ -265,6 +269,12 @@ def get_user(user_id):
                         user["peopleLeadEmail"] = people_lead["email"]
                 except:
                     pass
+
+        # --- FIX: Convert project ObjectIds to strings ---
+        if "projects" in user and isinstance(user["projects"], list):
+            for proj in user["projects"]:
+                if "_id" in proj and isinstance(proj["_id"], ObjectId):
+                    proj["_id"] = str(proj["_id"])
         
         return jsonify(user), 200
     except Exception as e:
@@ -289,6 +299,88 @@ def get_manager(employee_id):
         return jsonify(manager), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+# ------------------------------------------
+# PROJECT MANAGEMENT ROUTES (CLEAN + FIXED)
+# ------------------------------------------
+@user_bp.route("/assign_project/<user_id>", methods=["POST"])
+def assign_project(user_id):
+    data = request.get_json()
+    name = data.get("name")
+    start_raw = data.get("startDate")
+    end_raw = data.get("endDate")
+    assigned_by = data.get("assignedBy", "Admin")
+
+    if not name or not start_raw:
+        return jsonify({"error": "Project name and start date required"}), 400
+
+    # Convert dates safely
+    try:
+        start = datetime.fromisoformat(start_raw).date().isoformat()
+    except:
+        return jsonify({"error": "Invalid start date"}), 400
+
+    end = None
+    if end_raw:
+        try:
+            end = datetime.fromisoformat(end_raw).date().isoformat()
+        except:
+            end = None
+
+    project = {
+        "_id": ObjectId(),
+        "name": name,
+        "startDate": start,
+        "endDate": end,
+        "assignedBy": assigned_by,
+        "createdAt": datetime.utcnow()
+    }
+
+    mongo.db.users.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$push": {"projects": project}}
+    )
+
+    project["_id"] = str(project["_id"])
+    return jsonify({"message": "Project assigned", "project": project}), 200
+
+
+@user_bp.route("/update_project/<user_id>/<project_id>", methods=["PUT"])
+def update_project(user_id, project_id):
+    data = request.get_json()
+
+    update_fields = {}
+    if "name" in data:
+        update_fields["projects.$.name"] = data["name"]
+    if "startDate" in data:
+        update_fields["projects.$.startDate"] = data["startDate"]
+    if "endDate" in data:
+        update_fields["projects.$.endDate"] = data["endDate"]
+
+    result = mongo.db.users.update_one(
+        {"_id": ObjectId(user_id), "projects._id": ObjectId(project_id)},
+        {"$set": update_fields}
+    )
+
+    if result.modified_count == 0:
+        return jsonify({"error": "Project not found or no changes"}), 404
+
+    return jsonify({"message": "Project updated"}), 200
+
+
+@user_bp.route("/delete_project/<user_id>/<project_id>", methods=["DELETE"])
+def delete_project(user_id, project_id):
+    result = mongo.db.users.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$pull": {"projects": {"_id": ObjectId(project_id)}}}
+    )
+
+    if result.modified_count == 0:
+        return jsonify({"error": "Project not found"}), 404
+
+    return jsonify({"message": "Project removed"}), 200
+
 
 
 # -------------------------------

@@ -30,11 +30,18 @@ def recalculate_all_balances():
             else:
                 join_dt = join_date
                 
-            months_employed = (today.year - join_dt.year) * 12 + (today.month - join_dt.month) + 1
-            
+                months_employed = (today.year - join_dt.year) * 12 + (today.month - join_dt.month) + 1
+
+            # 🔹 NEW: Fortnight rule – if joined after 15th, don't count joining month
+            if join_dt.day > 15:
+                months_employed -= 1
+                if months_employed < 0:
+                    months_employed = 0
+
             # Calculate accrued balances
             planned_balance = months_employed * 1.0
             sick_balance = months_employed * 0.5
+
             
             # Update employee
             new_balance = {

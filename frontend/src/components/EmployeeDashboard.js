@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import OrganizationHierarchy from "./OrganizationHierarchy";
 import LeaveStatusDot from './LeaveStatusDot';
+import BannerImage from "../assets/banner.png";
 
 const EmployeeDashboard = ({ user, setSection }) => {
 
@@ -209,83 +210,49 @@ const EmployeeDashboard = ({ user, setSection }) => {
           </div>
         </div>
         
-        {/* Banner Section */}
-        <div style={{ marginBottom: 32 }}>
+      {/* Banner Section */}
+      <div style={{ marginBottom: 32 }}>
+        <div
+          style={{
+            background: "white",
+            borderRadius: 16,
+            overflow: "hidden",
+            boxShadow: "0 4px 20px rgba(0, 0, 0, 0.08)",
+            border: "1px solid #e5e7eb",
+            position: "relative",
+            height: 280,
+          }}
+        >
+          <img
+            src={BannerImage}
+            alt="Festival Banner"
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+            }}
+          />
+
+          {/* Corner Badge */}
           <div
             style={{
-              background: "white",
-              borderRadius: 16,
-              overflow: "hidden",
-              boxShadow: "0 4px 20px rgba(0, 0, 0, 0.08)",
-              border: "1px solid #e5e7eb",
-              position: "relative",
-              height: 280,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              backgroundImage: "linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)",
+              position: "absolute",
+              top: 16,
+              right: 16,
+              background: "rgba(102, 126, 234, 0.9)",
+              color: "white",
+              padding: "8px 16px",
+              borderRadius: 20,
+              fontSize: 12,
+              fontWeight: 600,
+              boxShadow: "0 2px 8px rgba(0, 0, 0, 0.15)",
             }}
           >
-            {/* Placeholder Content */}
-            <div style={{ textAlign: "center", padding: 40 }}>
-              <div
-                style={{
-                  width: 120,
-                  height: 120,
-                  margin: "0 auto 20px",
-                  borderRadius: "50%",
-                  background: "rgba(102, 126, 234, 0.1)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  border: "3px dashed #667eea",
-                }}
-              >
-                <span style={{ fontSize: 48 }}>🎉</span>
-              </div>
-              <h3
-                style={{
-                  margin: 0,
-                  marginBottom: 8,
-                  fontSize: 20,
-                  fontWeight: 700,
-                  color: "#374151",
-                }}
-              >
-                Festival & Announcements Banner
-              </h3>
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: 14,
-                  color: "#6b7280",
-                  maxWidth: 400,
-                  margin: "0 auto",
-                }}
-              >
-                This space is reserved for upcoming festivals, special announcements, and company celebrations
-              </p>
-            </div>
-
-            {/* Corner Badge */}
-            <div
-              style={{
-                position: "absolute",
-                top: 16,
-                right: 16,
-                background: "rgba(102, 126, 234, 0.9)",
-                color: "white",
-                padding: "8px 16px",
-                borderRadius: 20,
-                fontSize: 12,
-                fontWeight: 600,
-                boxShadow: "0 2px 8px rgba(0, 0, 0, 0.15)",
-              }}
-            >
-              📢 Coming Soon
-            </div>
+            📢 Festival Announcement
           </div>
         </div>
+      </div>
+
 
         {/* Main Grid */}
         <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 24, marginBottom: 24 }}>

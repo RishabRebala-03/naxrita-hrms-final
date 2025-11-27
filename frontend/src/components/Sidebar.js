@@ -7,6 +7,7 @@ const Sidebar = ({ section, setSection, role, restricted = [] }) => {
     { key: "dashboard", label: "🏠 Dashboard", roles: ["Admin", "Manager", "Employee"] },
     { key: "employees", label: "👥 Employees", roles: ["Admin", "Manager"] },
     { key: "leaves", label: "📋 Leaves", roles: ["Admin", "Manager", "Employee"] },
+    { key: "tea-coffee", label: "☕ Tea/Coffee", roles: ["Admin", "Manager", "Employee"] },  // NEW
     { key: "apply-behalf", label: "📝 Apply Leave on Behalf", roles: ["Admin"] },
     { key: "logs", label: "📜 Change Logs", roles: ["Admin"] },
     { key: "add", label: "➕ Add Employee", roles: ["Admin"] },

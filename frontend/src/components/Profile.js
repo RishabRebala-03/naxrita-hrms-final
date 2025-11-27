@@ -1,3 +1,4 @@
+// frontend/src/components/Profile.js
 import React, { useState, useEffect } from "react";
 
 const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
@@ -7,6 +8,14 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
   const [editForm, setEditForm] = useState({});
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showProjectModal, setShowProjectModal] = useState(false);
+  const [projectForm, setProjectForm] = useState({
+    _id: null,
+    name: "",
+    startDate: "",
+    endDate: ""
+  });
+
   
   // Password change state
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -72,6 +81,62 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
     }
   };
 
+  // Helper to format project dates
+  const formatProjectDate = (date) => {
+    if (!date) return "Present";
+
+    const d = new Date(date);
+    if (isNaN(d)) return "Present";
+
+    return d.toLocaleDateString("en-US", {
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  // Calculate tenure from a start date until today
+  const calculateTenure = (startDate) => {
+  if (!startDate) return "N/A";
+
+  // Normalize ANY backend date into a safe JS Date
+  let cleaned = startDate;
+
+  if (typeof cleaned === "string") {
+    cleaned = cleaned.replace("Z", "").replace("+00:00", "");
+    cleaned = cleaned.replace(/\.\d{3}/, ""); // strip milliseconds
+  }
+
+  const start = new Date(cleaned);
+  const today = new Date();
+
+  if (isNaN(start.getTime())) {
+    console.error("❌ Invalid start date received by tenure calculator:", startDate);
+    return "N/A";
+  }
+
+  // If joining date is in future → tenure = 0
+  if (start > today) {
+    return "0y 0m 0d";
+  }
+
+  let years = today.getFullYear() - start.getFullYear();
+  let months = today.getMonth() - start.getMonth();
+  let days = today.getDate() - start.getDate();
+
+  if (days < 0) {
+    months -= 1;
+    const prevMonthDays = new Date(today.getFullYear(), today.getMonth(), 0).getDate();
+    days += prevMonthDays;
+  }
+
+  if (months < 0) {
+    years -= 1;
+    months += 12;
+  }
+
+  return `${years} years ${months} months ${days} days`;
+  };
+
   const fetchProfile = async (userId) => {
     // ✅ CRITICAL FIX: Validate userId before making API call
     if (!userId) {
@@ -126,9 +191,7 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
         shiftTimings: data.shiftTimings || "",
         dateOfJoining: dateToInputFormat(data.dateOfJoining),
         dateOfBirth: dateToInputFormat(data.dateOfBirth),
-        projects: Array.isArray(data.projects)
-          ? data.projects.join(", ")
-          : "",
+        projects: data.projects || [],
         reportsToEmail: data.reportsToEmail || "",
         workLocation: data.workLocation || "",
         peopleLeadEmail: data.peopleLeadEmail || "",
@@ -237,6 +300,49 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
   const handleEdit = () => {
     setIsEditing(true);
     setMessage("");
+  };
+
+  const handleEditProject = (proj) => {
+  setProjectForm({
+    _id: proj._id,
+    name: proj.name,
+    startDate: proj.startDate,
+    endDate: proj.endDate || ""
+  });
+  setShowProjectModal(true);
+};
+
+  const deleteProject = async (projectId) => {
+    console.log("🗑️ deleteProject CALLED with:", projectId);
+
+    if (!projectId || projectId === "undefined") {
+      console.error("❌ ERROR: deleteProject called with INVALID projectId:", projectId);
+      alert("Cannot delete project: Invalid project ID");
+      return;
+    }
+
+    if (!window.confirm("Delete this project?")) return;
+
+    await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/users/delete_project/${employeeId}/${projectId}`, {
+      method: "DELETE"
+    });
+
+    fetchProfile(employeeId);
+  };
+
+  const saveProject = async () => {
+    const url = projectForm._id
+      ? `${process.env.REACT_APP_BACKEND_URL}/api/users/update_project/${employeeId}/${projectForm._id}`
+      : `${process.env.REACT_APP_BACKEND_URL}/api/users/assign_project/${employeeId}`;
+
+    await fetch(url, {
+      method: projectForm._id ? "PUT" : "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(projectForm)
+    });
+
+    setShowProjectModal(false);
+    fetchProfile(employeeId);
   };
 
   const handleCancel = () => {
@@ -604,6 +710,11 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
                     Date of Joining
                   </div>
                   <div>{formatDate(profile.dateOfJoining)}</div>
+                    
+                  <div style={{ marginTop: 4, fontSize: 13, color: "#10b981" }}>
+                    Tenure: {calculateTenure(profile.dateOfJoining.$date || profile.dateOfJoining)}
+                  </div>
+
                   <br></br>
                   {profile.reportsToEmail && ( 
                   <div> 
@@ -639,27 +750,92 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
             {/* Projects */}
             <div className="card" style={{ padding: 20 }}>
               <h4 style={{ marginTop: 0, marginBottom: 16 }}>Projects</h4>
-              {profile.projects && profile.projects.length > 0 ? (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  {profile.projects.map((proj, idx) => (
-                    <span
-                      key={idx}
-                      className="badge"
-                      style={{
-                        background: "#e6f0ff",
-                        color: "#1f6feb",
-                        padding: "6px 12px",
-                        fontSize: 13,
-                      }}
-                    >
-                      {proj}
-                    </span>
-                  ))}
+
+              {role === "Admin" && (
+                <button
+                  className="btn"
+                  onClick={() => {
+                    setProjectForm({ _id: null, name: "", startDate: "", endDate: "" });
+                    setShowProjectModal(true);
+                  }}
+                  style={{ marginBottom: 12 }}
+                >
+                  ➕ Assign Project
+                </button>
+              )}
+
+              {Array.isArray(profile.projects) && profile.projects.length > 0 ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  {profile.projects.map((proj) => {
+                    if (!proj || !proj._id) {
+                      console.error("❌ Invalid project object:", proj);
+                      return null;
+                    }
+                    const startDate = new Date(proj.startDate);
+                    const endDate = proj.endDate ? new Date(proj.endDate) : new Date();
+
+                    // if invalid, skip duration
+                    let duration = "N/A";
+
+                    if (!isNaN(startDate) && !isNaN(endDate)) {
+                      const ms = endDate - startDate;
+                      const totalDays = Math.floor(ms / (1000 * 60 * 60 * 24));
+                      const months = Math.floor(totalDays / 30);
+                      const days = totalDays % 30;
+
+                      duration = proj.endDate
+                        ? `${months}months ${days}days`
+                        : `Ongoing • ${months}months ${days}days`;
+                    }
+                    return (
+                      <div 
+                        key={proj._id}
+                        style={{
+                          padding: 14,
+                          border: "1px solid #e5e7eb",
+                          borderRadius: 10,
+                          background: proj.endDate ? "#f3f4f6" : "#ecfdf5"
+                        }}
+                      >
+                        <strong style={{ fontSize: 16 }}>{proj.name}</strong>
+
+                        {/* Dates */}
+                        <div style={{ fontSize: 13, marginTop: 4, color: "#6b7280" }}>
+                          {formatProjectDate(proj.startDate)} → {formatProjectDate(proj.endDate)}
+                        </div>
+
+                        {/* Duration */}
+                        <div style={{ fontSize: 13, marginTop: 4, color: "#10b981" }}>
+                          {duration}
+                        </div>
+
+                        {/* Admin Controls */}
+                        {role === "Admin" && (
+                          <div style={{ marginTop: 8, display: "flex", gap: 10 }}>
+                            <button
+                              className="btn ghost"
+                              onClick={() => handleEditProject(proj)}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              className="btn ghost"
+                              style={{ color: "red", borderColor: "red" }}
+                              onClick={() => deleteProject(proj._id)}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="muted">No projects assigned</div>
               )}
             </div>
+
 
             {/* Leave Balance */}
             <div className="card" style={{ padding: 20 }}>
@@ -918,24 +1094,6 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
             />
             </div>
 
-            <div style={{ gridColumn: "1 / -1" }}>
-              <label
-                style={{
-                  fontSize: 12,
-                  color: "#6b7280",
-                  display: "block",
-                  marginBottom: 4,
-                }}
-              >
-                Projects (comma-separated)
-              </label>
-              <input
-                className="input"
-                value={editForm.projects}
-                onChange={(e) => handleInputChange("projects", e.target.value)}
-                placeholder="Project A, Project B, Project C"
-              />
-            </div>
             <div>
               <label style={{ fontSize: 12, color: "#6b7280", display: "block", marginBottom: 4 }}>
                 Work Location
@@ -1133,6 +1291,43 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
           </div>
         </div>
       )}
+
+      {showProjectModal && (
+        <div className="overlay">
+          <div className="modal">
+            <h3>{projectForm._id ? "Edit Project" : "Assign Project"}</h3>
+
+            <label>Project Name</label>
+            <input
+              className="input"
+              value={projectForm.name}
+              onChange={(e) => setProjectForm({ ...projectForm, name: e.target.value })}
+            />
+          
+            <label>Start Date</label>
+            <input
+              className="input"
+              type="date"
+              value={projectForm.startDate}
+              onChange={(e) => setProjectForm({ ...projectForm, startDate: e.target.value })}
+            />
+
+            <label>End Date</label>
+            <input
+              className="input"
+              type="date"
+              value={projectForm.endDate}
+              onChange={(e) => setProjectForm({ ...projectForm, endDate: e.target.value })}
+            />
+
+            <div style={{ marginTop: 16, display: "flex", gap: 12 }}>
+              <button className="btn" onClick={saveProject}>Save</button>
+              <button className="btn ghost" onClick={() => setShowProjectModal(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {/* Message Display */}
       {message && (

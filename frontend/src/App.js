@@ -9,7 +9,6 @@ import UserList from "./components/UserList";
 import ManagerInfo from "./components/ManagerInfo";
 import Profile from "./components/Profile";
 import Calendar from "./components/Calendar";
-// ⬇️ CHANGE: import the default export as AdminDashboard
 import AdminDashboard from "./components/Dashboard";
 import EmployeeDashboard from "./components/EmployeeDashboard";
 import ManagerDashboard from "./components/ManagerDashboard";
@@ -21,6 +20,7 @@ import AdminLeaves from "./components/AdminLeaves";
 import AdminHolidays from "./components/AdminHolidays";
 import AdminApplyLeave from "./components/AdminApplyLeave";
 import AdminLogs from "./components/AdminLogs";
+import TeaCoffee from "./components/TeaCoffee";
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -216,6 +216,9 @@ function App() {
 
       case "calendar":
         return <Calendar user={currentUser} />;
+
+      case "tea-coffee":
+        return <TeaCoffee user={currentUser} />;
 
       default:
         // Default to dashboard
