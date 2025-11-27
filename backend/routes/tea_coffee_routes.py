@@ -10,6 +10,84 @@ CORS(tea_coffee_bp)
 CUTOFF_TIME = "10:30"  # 10:30 AM cutoff
 
 # -------------------------------
+# Get Blocked Dates
+# -------------------------------
+@tea_coffee_bp.route("/blocked_dates", methods=["GET"])
+@cross_origin()
+def get_blocked_dates():
+    try:
+        blocked = list(mongo.db.tea_coffee_blocked_dates.find({}, {"_id": 0, "date": 1, "reason": 1}))
+        return jsonify(blocked), 200
+    except Exception as e:
+        print(f"❌ Error fetching blocked dates: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+# -------------------------------
+# Block Date (Admin Only)
+# -------------------------------
+@tea_coffee_bp.route("/block_date", methods=["POST"])
+@cross_origin()
+def block_date():
+    try:
+        data = request.get_json()
+        date = data.get("date")
+        reason = data.get("reason", "Unavailable")
+        
+        if not date:
+            return jsonify({"error": "Date is required"}), 400
+        
+        # Check if already blocked
+        existing = mongo.db.tea_coffee_blocked_dates.find_one({"date": date})
+        if existing:
+            return jsonify({"error": "Date is already blocked"}), 400
+        
+        # Add to blocked dates
+        mongo.db.tea_coffee_blocked_dates.insert_one({
+            "date": date,
+            "reason": reason,
+            "blocked_at": datetime.utcnow()
+        })
+        
+        # Cancel all existing orders for this date
+        result = mongo.db.tea_coffee_orders.delete_many({"date": date})
+        
+        return jsonify({
+            "message": f"Date blocked successfully. {result.deleted_count} orders cancelled.",
+            "cancelled_orders": result.deleted_count
+        }), 200
+        
+    except Exception as e:
+        print(f"❌ Error blocking date: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+# -------------------------------
+# Unblock Date (Admin Only)
+# -------------------------------
+@tea_coffee_bp.route("/unblock_date", methods=["DELETE"])
+@cross_origin()
+def unblock_date():
+    try:
+        data = request.get_json()
+        date = data.get("date")
+        
+        if not date:
+            return jsonify({"error": "Date is required"}), 400
+        
+        result = mongo.db.tea_coffee_blocked_dates.delete_one({"date": date})
+        
+        if result.deleted_count == 0:
+            return jsonify({"error": "Date was not blocked"}), 404
+        
+        return jsonify({"message": "Date unblocked successfully"}), 200
+        
+    except Exception as e:
+        print(f"❌ Error unblocking date: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+# -------------------------------
 # Get Orders for Employee (15 days)
 # -------------------------------
 @tea_coffee_bp.route("/my_orders/<user_id>", methods=["GET"])
@@ -62,6 +140,12 @@ def place_order():
 
         if not morning and not evening:
             return jsonify({"error": "Please select at least one item"}), 400
+
+        # Check if date is blocked
+        blocked = mongo.db.tea_coffee_blocked_dates.find_one({"date": date})
+        if blocked:
+            reason = blocked.get("reason", "Unavailable")
+            return jsonify({"error": f"Tea/Coffee unavailable on this date: {reason}"}), 400
 
         order_date = datetime.strptime(date, "%Y-%m-%d").date()
         today = datetime.now().date()

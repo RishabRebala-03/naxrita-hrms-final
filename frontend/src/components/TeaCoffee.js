@@ -6,10 +6,336 @@ import "../App.css";
 const API_BASE = "http://localhost:5000/api/tea_coffee";
 
 // ===========================================
+// YEARLY CALENDAR FOR BLOCKING DATES
+// ===========================================
+const YearlyCalendarModal = ({ onClose, blockedDates, onBlockDate, onUnblockDate }) => {
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedDateToBlock, setSelectedDateToBlock] = useState(null);
+  const [blockReason, setBlockReason] = useState("");
+  const [showBlockDialog, setShowBlockDialog] = useState(false);
+
+  const months = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
+
+  const isDateBlocked = (date) => {
+    return blockedDates.some(bd => bd.date === date);
+  };
+
+  const getBlockReason = (date) => {
+    const blocked = blockedDates.find(bd => bd.date === date);
+    return blocked ? blocked.reason : "";
+  };
+
+  const handleDateClick = (dateStr) => {
+    if (isDateBlocked(dateStr)) {
+      // If already blocked, ask to unblock
+      if (window.confirm(`Unblock ${dateStr}?\nReason: ${getBlockReason(dateStr)}`)) {
+        onUnblockDate(dateStr);
+      }
+    } else {
+      // Show block dialog
+      setSelectedDateToBlock(dateStr);
+      setShowBlockDialog(true);
+    }
+  };
+
+  const handleBlockSubmit = () => {
+    if (!selectedDateToBlock) return;
+    onBlockDate(selectedDateToBlock, blockReason || "Unavailable");
+    setShowBlockDialog(false);
+    setSelectedDateToBlock(null);
+    setBlockReason("");
+  };
+
+  const renderMonth = (monthIndex) => {
+    const firstDay = new Date(selectedYear, monthIndex, 1);
+    const lastDay = new Date(selectedYear, monthIndex + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startingDayOfWeek = firstDay.getDay();
+
+    const days = [];
+    
+    // Empty cells for days before month starts
+    for (let i = 0; i < startingDayOfWeek; i++) {
+      days.push(<div key={`empty-${i}`} style={{ padding: 8 }} />);
+    }
+
+    // Actual days
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateStr = `${selectedYear}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const blocked = isDateBlocked(dateStr);
+      const dayOfWeek = new Date(selectedYear, monthIndex, day).getDay();
+      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+
+      days.push(
+        <div
+          key={day}
+          onClick={() => !isWeekend && handleDateClick(dateStr)}
+          style={{
+            padding: 8,
+            textAlign: "center",
+            cursor: isWeekend ? "not-allowed" : "pointer",
+            background: blocked ? "#fee2e2" : isWeekend ? "#f3f4f6" : "white",
+            border: blocked ? "2px solid #ef4444" : "1px solid #e5e7eb",
+            borderRadius: 4,
+            fontSize: 13,
+            fontWeight: blocked ? 600 : 400,
+            color: isWeekend ? "#9ca3af" : blocked ? "#dc2626" : "#374151",
+            opacity: isWeekend ? 0.5 : 1,
+            transition: "all 0.2s",
+          }}
+          title={blocked ? `Blocked: ${getBlockReason(dateStr)}` : isWeekend ? "Weekend" : "Click to block"}
+        >
+          {day}
+        </div>
+      );
+    }
+
+    return (
+      <div style={{ marginBottom: 20 }}>
+        <h4 style={{ marginBottom: 10, fontSize: 14, fontWeight: 600, color: "#374151" }}>
+          {months[monthIndex]}
+        </h4>
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(7, 1fr)",
+          gap: 4,
+          fontSize: 12
+        }}>
+          {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
+            <div key={i} style={{ padding: 4, textAlign: "center", fontWeight: 600, color: "#6b7280" }}>
+              {d}
+            </div>
+          ))}
+          {days}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div style={{
+      position: "fixed",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: "rgba(0,0,0,0.5)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 1000,
+      padding: 20
+    }}>
+      <div style={{
+        background: "white",
+        borderRadius: 12,
+        maxWidth: 1200,
+        width: "100%",
+        maxHeight: "90vh",
+        overflow: "auto",
+        boxShadow: "0 20px 60px rgba(0,0,0,0.3)"
+      }}>
+        {/* Header */}
+        <div style={{
+          padding: 24,
+          borderBottom: "2px solid #e5e7eb",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          position: "sticky",
+          top: 0,
+          background: "white",
+          zIndex: 10
+        }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 24 }}>🗓️ Block Tea/Coffee Dates</h2>
+            <p style={{ margin: "8px 0 0 0", color: "#6b7280", fontSize: 14 }}>
+              Click on any date to block/unblock. Weekends are automatically disabled.
+            </p>
+          </div>
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <button
+              onClick={() => setSelectedYear(selectedYear - 1)}
+              style={{
+                padding: "8px 16px",
+                background: "#f3f4f6",
+                border: "none",
+                borderRadius: 6,
+                cursor: "pointer",
+                fontWeight: 600
+              }}
+            >
+              ← {selectedYear - 1}
+            </button>
+            <span style={{ fontSize: 20, fontWeight: 700, minWidth: 80, textAlign: "center" }}>
+              {selectedYear}
+            </span>
+            <button
+              onClick={() => setSelectedYear(selectedYear + 1)}
+              style={{
+                padding: "8px 16px",
+                background: "#f3f4f6",
+                border: "none",
+                borderRadius: 6,
+                cursor: "pointer",
+                fontWeight: 600
+              }}
+            >
+              {selectedYear + 1} →
+            </button>
+            <button
+              onClick={onClose}
+              style={{
+                padding: "8px 16px",
+                background: "#ef4444",
+                color: "white",
+                border: "none",
+                borderRadius: 6,
+                cursor: "pointer",
+                fontWeight: 600,
+                marginLeft: 20
+              }}
+            >
+              ✕ Close
+            </button>
+          </div>
+        </div>
+
+        {/* Calendar Grid */}
+        <div style={{
+          padding: 24,
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+          gap: 24
+        }}>
+          {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map(monthIndex => renderMonth(monthIndex))}
+        </div>
+
+        {/* Legend */}
+        <div style={{
+          padding: 24,
+          borderTop: "2px solid #e5e7eb",
+          display: "flex",
+          gap: 20,
+          justifyContent: "center",
+          background: "#f9fafb"
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ width: 20, height: 20, background: "white", border: "1px solid #e5e7eb", borderRadius: 4 }} />
+            <span style={{ fontSize: 13 }}>Available</span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ width: 20, height: 20, background: "#fee2e2", border: "2px solid #ef4444", borderRadius: 4 }} />
+            <span style={{ fontSize: 13 }}>Blocked</span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ width: 20, height: 20, background: "#f3f4f6", border: "1px solid #e5e7eb", borderRadius: 4 }} />
+            <span style={{ fontSize: 13 }}>Weekend</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Block Reason Dialog */}
+      {showBlockDialog && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: "rgba(0,0,0,0.7)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 1001
+        }}>
+          <div style={{
+            background: "white",
+            padding: 30,
+            borderRadius: 12,
+            maxWidth: 400,
+            width: "90%",
+            boxShadow: "0 20px 60px rgba(0,0,0,0.3)"
+          }}>
+            <h3 style={{ marginBottom: 16 }}>🚫 Block Date</h3>
+            <p style={{ marginBottom: 16, color: "#6b7280" }}>
+              <strong>{selectedDateToBlock}</strong>
+            </p>
+            
+            <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>
+              Reason (optional):
+            </label>
+            <input
+              type="text"
+              value={blockReason}
+              onChange={(e) => setBlockReason(e.target.value)}
+              placeholder="e.g., Holiday, Maintenance"
+              style={{
+                width: "100%",
+                padding: 10,
+                border: "2px solid #e5e7eb",
+                borderRadius: 6,
+                marginBottom: 20,
+                fontSize: 14
+              }}
+              autoFocus
+            />
+
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                onClick={handleBlockSubmit}
+                style={{
+                  flex: 1,
+                  padding: 12,
+                  background: "#ef4444",
+                  color: "white",
+                  border: "none",
+                  borderRadius: 6,
+                  cursor: "pointer",
+                  fontWeight: 600
+                }}
+              >
+                Block Date
+              </button>
+              <button
+                onClick={() => {
+                  setShowBlockDialog(false);
+                  setSelectedDateToBlock(null);
+                  setBlockReason("");
+                }}
+                style={{
+                  flex: 1,
+                  padding: 12,
+                  background: "#6b7280",
+                  color: "white",
+                  border: "none",
+                  borderRadius: 6,
+                  cursor: "pointer"
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ===========================================
 // ⭐ BEAUTIFUL ADMIN UI FOR TEA/COFFEE ORDERS
 // ===========================================
 
-const AdminView = ({ dates, orders, formatDate }) => {
+const AdminView = ({ dates, orders, formatDate, blockedDates, onBlockDate, onUnblockDate }) => {
+
+  const [showBlockModal, setShowBlockModal] = useState(false);
+  const [selectedDateToBlock, setSelectedDateToBlock] = useState("");
+  const [blockReason, setBlockReason] = useState("");
+  const [showYearlyCalendar, setShowYearlyCalendar] = useState(false);
 
   const getStats = (date) => {
     const dayOrders = orders[date] || [];
@@ -35,6 +361,26 @@ const AdminView = ({ dates, orders, formatDate }) => {
     };
   };
 
+  const isBlocked = (date) => {
+    return blockedDates.some(bd => bd.date === date);
+  };
+
+  const getBlockReason = (date) => {
+    const blocked = blockedDates.find(bd => bd.date === date);
+    return blocked ? blocked.reason : "";
+  };
+
+  const handleBlockSubmit = () => {
+    if (!selectedDateToBlock) {
+      alert("Please select a date");
+      return;
+    }
+    onBlockDate(selectedDateToBlock, blockReason || "Unavailable");
+    setShowBlockModal(false);
+    setSelectedDateToBlock("");
+    setBlockReason("");
+  };
+
   const Metric = ({ label, value, color }) => (
     <div style={{ flex: 1, textAlign: "center" }}>
       <div style={{ fontSize: 14, fontWeight: 600, color: "#6b7280" }}>{label}</div>
@@ -45,85 +391,132 @@ const AdminView = ({ dates, orders, formatDate }) => {
   const DayCard = ({ date, large = false }) => {
     const stats = getStats(date);
     const d = formatDate(date);
+    const blocked = isBlocked(date);
+    const reason = getBlockReason(date);
 
     return (
       <div
         style={{
-          background: "white",
+          background: blocked ? "#fee2e2" : "white",
           padding: large ? 28 : 18,
           borderRadius: 12,
-          border: "1px solid #e5e7eb",
+          border: blocked ? "2px solid #ef4444" : "1px solid #e5e7eb",
           boxShadow: "0 4px 10px rgba(0,0,0,0.05)",
+          position: "relative"
         }}
       >
+        {/* Blocked Badge */}
+        {blocked && (
+          <div style={{
+            position: "absolute",
+            top: 10,
+            right: 10,
+            background: "#ef4444",
+            color: "white",
+            padding: "4px 12px",
+            borderRadius: 6,
+            fontSize: 12,
+            fontWeight: 600
+          }}>
+            🚫 BLOCKED
+          </div>
+        )}
+
         {/* Header */}
         <div style={{ marginBottom: 20 }}>
           <div style={{ fontSize: large ? 24 : 18, fontWeight: 700 }}>
             {d.full}
           </div>
           <div style={{ fontSize: 14, color: "#6b7280" }}>{date}</div>
+          {blocked && (
+            <div style={{ fontSize: 13, color: "#dc2626", marginTop: 4, fontStyle: "italic" }}>
+              Reason: {reason}
+            </div>
+          )}
         </div>
 
-        {/* Total Orders */}
-        <div
-          style={{
-            marginBottom: 20,
-            display: "flex",
-            justifyContent: "center",
-          }}
-        >
-          <Metric label="Total Orders" value={stats.total} color="#1f2937" />
-        </div>
-
-        {/* Morning & Evening Grid */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(2, 1fr)",
-            gap: 16,
-          }}
-        >
-          {/* Morning */}
-          <div
-            style={{
-              padding: 14,
-              background: "#f9fafb",
-              borderRadius: 10,
-              border: "1px solid #e5e7eb",
-            }}
-          >
-            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 10 }}>
-              ☀️ Morning
+        {!blocked && (
+          <>
+            {/* Total Orders */}
+            <div
+              style={{
+                marginBottom: 20,
+                display: "flex",
+                justifyContent: "center",
+              }}
+            >
+              <Metric label="Total Orders" value={stats.total} color="#1f2937" />
             </div>
 
-            <Metric label="Tea" value={stats.morningTea} color="#10b981" />
-            <Metric label="Coffee" value={stats.morningCoffee} color="#f59e0b" />
-          </div>
+            {/* Morning & Evening Grid */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(2, 1fr)",
+                gap: 16,
+              }}
+            >
+              {/* Morning */}
+              <div
+                style={{
+                  padding: 14,
+                  background: "#f9fafb",
+                  borderRadius: 10,
+                  border: "1px solid #e5e7eb",
+                }}
+              >
+                <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 10 }}>
+                  ☀️ Morning
+                </div>
 
-          {/* Evening */}
-          <div
-            style={{
-              padding: 14,
-              background: "#f9fafb",
-              borderRadius: 10,
-              border: "1px solid #e5e7eb",
-            }}
-          >
-            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 10 }}>
-              🌙 Evening
+                <Metric label="Tea" value={stats.morningTea} color="#10b981" />
+                <Metric label="Coffee" value={stats.morningCoffee} color="#f59e0b" />
+              </div>
+
+              {/* Evening */}
+              <div
+                style={{
+                  padding: 14,
+                  background: "#f9fafb",
+                  borderRadius: 10,
+                  border: "1px solid #e5e7eb",
+                }}
+              >
+                <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 10 }}>
+                  🌙 Evening
+                </div>
+
+                <Metric label="Tea" value={stats.eveningTea} color="#10b981" />
+                <Metric label="Coffee" value={stats.eveningCoffee} color="#f59e0b" />
+              </div>
             </div>
-
-            <Metric label="Tea" value={stats.eveningTea} color="#10b981" />
-            <Metric label="Coffee" value={stats.eveningCoffee} color="#f59e0b" />
-          </div>
-        </div>
+          </>
+        )}
       </div>
     );
   };
 
-  return (
+return (
     <div style={{ padding: 24 }}>
-      <h1 style={{ fontSize: 28, marginBottom: 20 }}>☕ Admin Tea/Coffee Dashboard</h1>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+        <h1 style={{ fontSize: 28, margin: 0 }}>☕ Admin Tea/Coffee Dashboard</h1>
+        <button
+          onClick={() => setShowYearlyCalendar(true)}
+          style={{
+            padding: "12px 24px",
+            background: "#3b82f6",
+            color: "white",
+            border: "none",
+            borderRadius: 8,
+            cursor: "pointer",
+            fontWeight: 600,
+            fontSize: 16,
+            boxShadow: "0 4px 12px rgba(59, 130, 246, 0.3)"
+          }}
+        >
+          🗓️ Manage Blocked Dates
+        </button>
+      </div>
 
       {/* TODAY BIG CARD */}
       <DayCard date={dates[0]} large />
@@ -144,6 +537,99 @@ const AdminView = ({ dates, orders, formatDate }) => {
           <DayCard key={date} date={date} />
         ))}
       </div>
+
+      {/* Block Date Modal */}
+      {showBlockModal && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: "rgba(0,0,0,0.5)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: "white",
+            padding: 30,
+            borderRadius: 12,
+            maxWidth: 500,
+            width: "90%",
+            boxShadow: "0 10px 40px rgba(0,0,0,0.2)"
+          }}>
+            <h3 style={{ marginBottom: 20 }}>🚫 Block Date</h3>
+            <p style={{ marginBottom: 16, color: "#6b7280" }}>
+              Date: <strong>{formatDate(selectedDateToBlock).full}</strong>
+            </p>
+            
+            <label style={{ display: "block", marginBottom: 8, fontWeight: 600 }}>
+              Reason (optional):
+            </label>
+            <input
+              type="text"
+              value={blockReason}
+              onChange={(e) => setBlockReason(e.target.value)}
+              placeholder="e.g., Holiday, Maintenance, etc."
+              style={{
+                width: "100%",
+                padding: "10px",
+                border: "2px solid #e5e7eb",
+                borderRadius: 6,
+                marginBottom: 20,
+                fontSize: 14
+              }}
+            />
+
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                onClick={handleBlockSubmit}
+                style={{
+                  flex: 1,
+                  padding: "12px",
+                  background: "#ef4444",
+                  color: "white",
+                  border: "none",
+                  borderRadius: 6,
+                  cursor: "pointer",
+                  fontWeight: 600
+                }}
+              >
+                Block Date
+              </button>
+              <button
+                onClick={() => {
+                  setShowBlockModal(false);
+                  setSelectedDateToBlock("");
+                  setBlockReason("");
+                }}
+                style={{
+                  flex: 1,
+                  padding: "12px",
+                  background: "#6b7280",
+                  color: "white",
+                  border: "none",
+                  borderRadius: 6,
+                  cursor: "pointer"
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Yearly Calendar Modal */}
+      {showYearlyCalendar && (
+        <YearlyCalendarModal
+          onClose={() => setShowYearlyCalendar(false)}
+          blockedDates={blockedDates}
+          onBlockDate={onBlockDate}
+          onUnblockDate={onUnblockDate}
+        />
+      )}
     </div>
   );
 };
@@ -165,6 +651,7 @@ const TeaCoffee = ({ user }) => {
   const [bulkMode, setBulkMode] = useState(false);
   const [bulkSelectedDates, setBulkSelectedDates] = useState([]);
   const [bulkSelection, setBulkSelection] = useState({ morning: null, evening: null });
+  const [blockedDates, setBlockedDates] = useState([]);
   const [selectedDate, setSelectedDate] = useState(null);
   const [tempSelection, setTempSelection] = useState({ morning: null, evening: null });
   const isAdmin = ["Admin", "admin", "System Administrator", "Administrator", "system-admin"].includes(
@@ -184,6 +671,15 @@ const TeaCoffee = ({ user }) => {
       dateList.push(date.toISOString().split("T")[0]);
     }
     setDates(dateList);
+  }, []);
+
+  const fetchBlockedDates = useCallback(async () => {
+  try {
+    const res = await axios.get(`${API_BASE}/blocked_dates`);
+    setBlockedDates(res.data);
+  } catch (err) {
+    console.error("❌ Error fetching blocked dates:", err);
+  }
   }, []);
 
   const fetchMyOrders = useCallback(async () => {
@@ -240,6 +736,32 @@ const TeaCoffee = ({ user }) => {
     setLoading(false);
   }, []);
 
+  const handleBlockDate = async (date, reason) => {
+  try {
+    const res = await axios.post(`${API_BASE}/block_date`, { date, reason });
+    alert(res.data.message);
+    fetchBlockedDates();
+    if (isAdmin) {
+      fetchAdminOrders();
+    }
+  } catch (err) {
+    alert(err.response?.data?.error || "Failed to block date");
+  }
+};
+
+  const handleUnblockDate = async (date) => {
+    if (!window.confirm("Are you sure you want to unblock this date?")) {
+      return;
+    }
+    try {
+      const res = await axios.delete(`${API_BASE}/unblock_date`, { data: { date } });
+      alert(res.data.message);
+      fetchBlockedDates();
+    } catch (err) {
+      alert(err.response?.data?.error || "Failed to unblock date");
+    }
+  };
+
   useEffect(() => {
     if (fetchedOnce.current) return;   // ⛔ prevents duplicate runs
     fetchedOnce.current = true;
@@ -248,6 +770,7 @@ const TeaCoffee = ({ user }) => {
     console.log("User ID:", userId);
 
     generateDates();
+    fetchBlockedDates(); 
 
     if (isAdmin) {
       fetchAdminOrders();
@@ -257,8 +780,11 @@ const TeaCoffee = ({ user }) => {
       console.error("❌ No user ID available");
       alert("Error: User information not available. Please log out and log in again.");
     }
-  }, [isAdmin, userId, generateDates, fetchMyOrders, fetchAdminOrders]);
+  }, [isAdmin, userId, generateDates, fetchMyOrders, fetchAdminOrders, fetchBlockedDates]);
 
+  const isDateBlocked = (date) => {
+  return blockedDates.some(bd => bd.date === date);
+  };
 
   const handleDateClick = (date) => {
     const day = new Date(date).getDay();
@@ -266,6 +792,7 @@ const TeaCoffee = ({ user }) => {
 
     if (isWeekend) return; // weekend disabled
     if (isPastCutoff(date)) return; // today's cutoff
+    if (isDateBlocked(date)) return;
 
     if (bulkMode) {
       // Toggle selection in bulk mode
@@ -516,7 +1043,7 @@ const TeaCoffee = ({ user }) => {
             const status = getOrderStatus(date);
             const day = new Date(date).getDay(); // 0 = Sun, 6 = Sat
             const isWeekend = day === 0 || day === 6;
-            const disabled = isPastCutoff(date) || isWeekend;
+            const disabled = isPastCutoff(date) || isWeekend || isDateBlocked(date); // ✅ ADD isDateBlocked(date)
             const isToday = date === new Date().toISOString().split("T")[0];
             const isBulkSelected = bulkMode && bulkSelectedDates.includes(date);
 
@@ -536,8 +1063,10 @@ const TeaCoffee = ({ user }) => {
                   opacity: disabled ? 0.4 : 1,
                   background: isWeekend
                     ? "#f3f4f6"
+                    : isDateBlocked(date)  // ✅ ADD THIS
+                    ? "#fee2e2"             // ✅ ADD THIS (red background for blocked)
                     : isBulkSelected
-                    ? "#d1fae5"                   // 🌿 Greenish background
+                    ? "#d1fae5"
                     : status === "both"
                     ? "#d1fae5"
                     : status === "partial"
@@ -835,7 +1364,7 @@ const TeaCoffee = ({ user }) => {
   }
 
   // Admin View (rest of the admin view code remains the same)
-  return <AdminView dates={dates} orders={orders} formatDate={formatDate} />;
+  return <AdminView dates={dates} orders={orders} formatDate={formatDate}  blockedDates={blockedDates} onBlockDate={handleBlockDate} onUnblockDate={handleUnblockDate} />;
 };
 
 export default TeaCoffee;
