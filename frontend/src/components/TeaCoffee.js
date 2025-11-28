@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import axios from "axios";
 import "../App.css";
 
-const API_BASE = "http://localhost:5000/api/tea_coffee";
+const API_BASE = `${process.env.REACT_APP_BACKEND_URL}/api/tea_coffee`;
 
 // ===========================================
 // YEARLY CALENDAR FOR BLOCKING DATES
