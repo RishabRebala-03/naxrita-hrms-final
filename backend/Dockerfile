@@ -11,11 +11,12 @@ RUN apt-get update && apt-get install -y \
 RUN pip install --no-cache-dir \
     flask \
     flask-cors \
+    flask-pymongo \  
     gunicorn \
     pymongo \
-    APScheduler\
-    python-dotenv\
-    python-dateutil\
+    APScheduler \
+    python-dotenv \
+    python-dateutil \
     requests
 
 COPY . .
