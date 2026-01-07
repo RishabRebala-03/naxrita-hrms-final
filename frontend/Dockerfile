@@ -7,11 +7,15 @@ RUN npm install
 COPY . .
 RUN npm run build
 
-# Runtime stage
-FROM nginx:alpine
+# Serve directly with Node (no Nginx needed)
+FROM node:21-alpine
 
-COPY --from=build /app/build /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+WORKDIR /app
+COPY --from=build /app/build ./build
 
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
+# Install serve to serve static files
+RUN npm install -g serve
+
+EXPOSE 3000
+
+CMD ["serve", "-s", "build", "-l", "3000"]
