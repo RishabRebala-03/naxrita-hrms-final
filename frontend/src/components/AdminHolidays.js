@@ -59,7 +59,7 @@ const AdminHolidays = () => {
         <input className="input" name="date" type="date" value={form.date} onChange={change} />
 
         <select className="input" name="type" value={form.type} onChange={change}>
-          <option value="national">National</option>
+          <option value="public">Public</option>
           <option value="optional">Optional</option>
           <option value="company">Company</option>
         </select>

@@ -1,4 +1,4 @@
-// src/components/EmployeeLeaves.js
+// src/components/EmployeeLeaves.js - WITH INTERN RESTRICTIONS
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 
@@ -10,22 +10,37 @@ const EmployeeLeaves = ({ user }) => {
     start_date: "",
     end_date: "",
     reason: "",
+    logout_time: "",
+    is_half_day: false,
+    half_day_period: "",
   });
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [editingLeave, setEditingLeave] = useState(null);
+  const [showTeamApprovals, setShowTeamApprovals] = useState(false);
+  const [hasReportees, setHasReportees] = useState(false);
+  const [teamPendingLeaves, setTeamPendingLeaves] = useState([]);
+  const [expandedTeamLeave, setExpandedTeamLeave] = useState(null);
+  const [rejectModal, setRejectModal] = useState({ show: false, leaveId: null, reason: "" });
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortBy, setSortBy] = useState("newest");
+  
+  const [historySearchTerm, setHistorySearchTerm] = useState("");
+  const [historyFilterStatus, setHistoryFilterStatus] = useState("all");
+  const [historyFilterType, setHistoryFilterType] = useState("all");
+  const [historySortBy, setHistorySortBy] = useState("newest");
+  
+  const [activeTab, setActiveTab] = useState("my-leaves");
 
   const fetchData = async () => {
     try {
       setLoading(true);
 
-      // Fetch balance
       const balanceRes = await axios.get(
         `${process.env.REACT_APP_BACKEND_URL}/api/leaves/balance/${user.id}`
       );
       setBalance(balanceRes.data);
 
-      // Fetch history
       const historyRes = await axios.get(
         `${process.env.REACT_APP_BACKEND_URL}/api/leaves/history/${user.id}`
       );
@@ -38,13 +53,48 @@ const EmployeeLeaves = ({ user }) => {
     }
   };
 
-  useEffect(() => {
-    if (user?.id) {
-      fetchData();
+  const checkForReportees = async () => {
+    try {
+      const res = await axios.get(
+        `${process.env.REACT_APP_BACKEND_URL}/api/users/get_employees_by_manager/${encodeURIComponent(user.email)}`
+      );
+      const reportees = res.data;
+      
+      if (Array.isArray(reportees) && reportees.length > 0) {
+        setHasReportees(true);
+      } else {
+        setHasReportees(false);
+      }
+    } catch (err) {
+      console.error("Error checking reportees:", err);
+      setHasReportees(false);
     }
-  }, [user]);
+  };
 
-  // ADD THIS NEW FUNCTION to check if selected date is birthday
+  const fetchTeamPendingLeaves = async () => {
+    try {
+      const res = await axios.get(
+        `${process.env.REACT_APP_BACKEND_URL}/api/leaves/pending/${encodeURIComponent(user.email)}`
+      );
+      setTeamPendingLeaves(res.data);
+    } catch (err) {
+      console.error("Error fetching team pending leaves:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (user?.id && user?.email) { 
+      fetchData();
+      checkForReportees();
+    }
+  }, [user?.id, user?.email]);
+
+  useEffect(() => {
+    if (hasReportees && activeTab === "team-leaves") {
+      fetchTeamPendingLeaves();
+    }
+  }, [hasReportees, activeTab]);
+
   const isBirthdayDate = (dateStr) => {
     if (!dateStr || !user?.dateOfBirth) return false;
     
@@ -67,12 +117,61 @@ const EmployeeLeaves = ({ user }) => {
     }
   };
 
-  const showBirthdayIndicator = leave.leave_type === "Optional" && 
-                                 leave.start_date && 
-                                 leave.end_date &&
-                                 leave.start_date === leave.end_date &&
-                                 isBirthdayDate(leave.start_date);
+  const getMinDate = () => {
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    
+    if (leave.leave_type === "Planned") {
+      const minDate = new Date(today);
+      minDate.setDate(today.getDate() + 7);
+      return minDate.toISOString().split('T')[0];
+    }
+    
+    if (leave.leave_type === "Sick" || leave.leave_type === "Early Logout") {
+      return todayStr;
+    }
+    
+    return todayStr;
+  };
 
+  const isDateBlockedForPlanned = (dateStr) => {
+    if (leave.leave_type !== "Planned") return false;
+    
+    const selectedDate = new Date(dateStr);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    selectedDate.setHours(0, 0, 0, 0);
+    
+    const daysDifference = Math.floor((selectedDate - today) / (1000 * 60 * 60 * 24));
+    return daysDifference < 7;
+  };
+
+  const handleDateClick = (e, dateField) => {
+    const selectedDate = e.target.value;
+    
+    if (dateField === "start") {
+      handleStartDateChange(selectedDate);
+    } else {
+      setLeave(prev => ({ ...prev, end_date: selectedDate }));
+    }
+  };
+
+  const handleHalfDayChange = (checked) => {
+    setLeave(prev => ({
+      ...prev,
+      is_half_day: checked,
+      half_day_period: checked ? "morning" : "",
+      end_date: checked ? prev.start_date : prev.end_date
+    }));
+  };
+
+  const handleStartDateChange = (value) => {
+    setLeave(prev => ({
+      ...prev,
+      start_date: value,
+      end_date: prev.is_half_day ? value : prev.end_date
+    }));
+  };
 
   const applyLeave = async () => {
     if (!leave.start_date || !leave.end_date) {
@@ -80,16 +179,22 @@ const EmployeeLeaves = ({ user }) => {
       return;
     }
 
-    if (leave.leave_type === "Planned") {
-      const today = new Date();
-      const startDate = new Date(leave.start_date);
-      const daysDifference = Math.ceil((startDate - today) / (1000 * 60 * 60 * 24));
-      
-      if (daysDifference < 7) {
-        setMessage("⚠️ Planned leave must be applied at least 7 days in advance");
-        setTimeout(() => setMessage(""), 5000);
-        return;
-      }
+    if (!leave.reason || !leave.reason.trim()) {
+      setMessage("⚠️ Reason is mandatory. Please provide a reason for your leave.");
+      setTimeout(() => setMessage(""), 5000);
+      return;
+    }
+
+    if (leave.is_half_day && !leave.half_day_period) {
+      setMessage("⚠️ Please select half-day period (morning or afternoon)");
+      setTimeout(() => setMessage(""), 5000);
+      return;
+    }
+
+    if (leave.leave_type === "Early Logout" && !leave.logout_time) {
+      setMessage("⚠️ Logout time is mandatory for early logout");
+      setTimeout(() => setMessage(""), 5000);
+      return;
     }
 
     try {
@@ -100,11 +205,22 @@ const EmployeeLeaves = ({ user }) => {
         start_date: leave.start_date,
         end_date: leave.end_date,
         reason: leave.reason,
+        logout_time: leave.logout_time || "",
+        is_half_day: leave.is_half_day,
+        half_day_period: leave.half_day_period || "",
       });
 
       if (res.status === 201) {
         setMessage("Leave applied successfully ✓");
-        setLeave({ leave_type: "Sick", start_date: "", end_date: "", reason: "" });
+        setLeave({ 
+          leave_type: "Sick", 
+          start_date: "", 
+          end_date: "", 
+          reason: "", 
+          logout_time: "",
+          is_half_day: false,
+          half_day_period: "",
+        });
         fetchData();
         setTimeout(() => setMessage(""), 3000);
       }
@@ -117,7 +233,6 @@ const EmployeeLeaves = ({ user }) => {
     }
   };
 
-  // Add this function after applyLeave():
   const updateLeave = async () => {
     if (!editingLeave.start_date || !editingLeave.end_date) {
       setMessage("Please select start and end dates");
@@ -133,6 +248,8 @@ const EmployeeLeaves = ({ user }) => {
           start_date: editingLeave.start_date,
           end_date: editingLeave.end_date,
           reason: editingLeave.reason,
+          is_half_day: editingLeave.is_half_day || false,
+          half_day_period: editingLeave.half_day_period || "",
         }
       );
 
@@ -150,7 +267,6 @@ const EmployeeLeaves = ({ user }) => {
       setLoading(false);
     }
   };
-
 
   const formatDate = (dateStr) => {
     if (!dateStr) return "N/A";
@@ -171,32 +287,166 @@ const EmployeeLeaves = ({ user }) => {
     }
   };
 
+  const isBirthdayLeave = (leave) => {
+    if (!leave.employee_dateOfBirth) return false;
+    try {
+      const dob = new Date(leave.employee_dateOfBirth);
+      const start = new Date(leave.start_date);
+
+      return (
+        dob.getMonth() === start.getMonth() &&
+        dob.getDate() === start.getDate()
+      );
+    } catch {
+      return false;
+    }
+  };
+
+  const getFilteredAndSortedHistory = (leaves) => {
+    let filtered = [...leaves];
+    
+    if (historySearchTerm.trim()) {
+      filtered = filtered.filter(leave => 
+        (leave.leave_type || "").toLowerCase().includes(historySearchTerm.toLowerCase()) ||
+        (leave.reason || "").toLowerCase().includes(historySearchTerm.toLowerCase()) ||
+        (leave.status || "").toLowerCase().includes(historySearchTerm.toLowerCase())
+      );
+    }
+    
+    if (historyFilterStatus !== "all") {
+      filtered = filtered.filter(leave => 
+        leave.status?.toLowerCase() === historyFilterStatus.toLowerCase()
+      );
+    }
+    
+    if (historyFilterType !== "all") {
+      filtered = filtered.filter(leave => 
+        leave.leave_type?.toLowerCase() === historyFilterType.toLowerCase()
+      );
+    }
+    
+    const sorted = [...filtered].sort((a, b) => {
+      switch (historySortBy) {
+        case "newest":
+          return new Date(b.applied_on) - new Date(a.applied_on);
+        case "oldest":
+          return new Date(a.applied_on) - new Date(b.applied_on);
+        case "start_date":
+          return new Date(b.start_date) - new Date(a.start_date);
+        case "status":
+          return (a.status || "").localeCompare(b.status || "");
+        case "type":
+          return (a.leave_type || "").localeCompare(b.leave_type || "");
+        default:
+          return 0;
+      }
+    });
+    
+    return sorted;
+  };
+
+  const getFilteredAndSortedTeamLeaves = (leaves) => {
+    let filtered = leaves;
+    
+    if (searchTerm.trim()) {
+      filtered = filtered.filter(leave => 
+        (leave.employee_name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (leave.employee_email || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (leave.employee_designation || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (leave.employee_department || "").toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+    
+    const sorted = [...filtered].sort((a, b) => {
+      switch (sortBy) {
+        case "newest":
+          return new Date(b.applied_on) - new Date(a.applied_on);
+        case "oldest":
+          return new Date(a.applied_on) - new Date(b.applied_on);
+        case "name":
+          return (a.employee_name || "").localeCompare(b.employee_name || "");
+        case "department":
+          return (a.employee_department || "").localeCompare(b.employee_department || "");
+        default:
+          return 0;
+      }
+    });
+    
+    return sorted;
+  };
+
+  const displayHistory = getFilteredAndSortedHistory(history);
+  const displayTeamLeaves = getFilteredAndSortedTeamLeaves(teamPendingLeaves);
+
   const cancelLeave = async (leaveId) => {
-  if (!window.confirm("Are you sure you want to cancel this leave?")) return;
+    if (!window.confirm("Are you sure you want to cancel this leave?")) return;
 
-  try {
-    setLoading(true);
+    try {
+      setLoading(true);
 
-    const res = await axios.put(
-      `${process.env.REACT_APP_BACKEND_URL}/api/leaves/cancel/${leaveId}`
-    );
+      const res = await axios.put(
+        `${process.env.REACT_APP_BACKEND_URL}/api/leaves/cancel/${leaveId}`
+      );
 
-    if (res.status === 200) {
-      setMessage("Leave cancelled successfully ✓");
-      fetchData();
+      if (res.status === 200) {
+        setMessage("Leave cancelled successfully ✓");
+        fetchData();
+        setTimeout(() => setMessage(""), 3000);
+      }
+    } catch (err) {
+      console.error(err);
+      setMessage(
+        "Error: " + (err.response?.data?.error || "Failed to cancel leave")
+      );
+      setTimeout(() => setMessage(""), 3000);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTeamReject = (leaveId) => {
+    setRejectModal({ show: true, leaveId, reason: "" });
+  };
+
+  const confirmTeamReject = async () => {
+    if (!rejectModal.reason.trim()) {
+      setMessage("Please enter a rejection reason");
+      return;
+    }
+    await updateTeamLeaveStatus(rejectModal.leaveId, "Rejected", rejectModal.reason);
+  };
+
+  const updateTeamLeaveStatus = async (leaveId, status, rejectionReason = "") => {
+    try {
+      const payload = { 
+        status,
+        approved_by: user.name || user.email
+      };
+
+      if (status === "Rejected" && rejectionReason.trim()) {
+        payload.rejection_reason = rejectionReason;
+      }
+
+      const res = await axios.put(
+        `${process.env.REACT_APP_BACKEND_URL}/api/leaves/update_status/${leaveId}`,
+        payload
+      );
+
+      if (res.status === 200) {
+        setMessage(`Leave ${status.toLowerCase()} successfully ✓`);
+        setRejectModal({ show: false, leaveId: null, reason: "" });
+        fetchTeamPendingLeaves();
+        setTimeout(() => setMessage(""), 3000);
+        
+        // Trigger notification refresh
+        window.dispatchEvent(new Event('refreshNotifications'));
+      }
+    } catch (err) {
+      console.error(err);
+      setMessage("Error updating leave status");
       setTimeout(() => setMessage(""), 3000);
     }
-  } catch (err) {
-    console.error(err);
-    setMessage(
-      "Error: " + (err.response?.data?.error || "Failed to cancel leave")
-    );
-    setTimeout(() => setMessage(""), 3000);
-  } finally {
-    setLoading(false);
-  }
-};
-
+  };
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -212,458 +462,898 @@ const EmployeeLeaves = ({ user }) => {
   };
 
   const totalBalance = balance
-    ? (balance.sick || 0) + (balance.planned || 0) + (balance.optional || 0)
+    ? (balance.sick || 0) + (balance.planned || 0)
     : 0;
+
+  // Check if user is an intern
+  const isIntern = user.employment_type === "Intern";
 
   return (
     <div className="panel">
+      {/* Header */}
       <div style={{ marginBottom: 24 }}>
-        <h3 style={{ margin: 0, marginBottom: 8 }}>My Leaves</h3>
-        <p className="muted">Apply for leave and track your leave balance</p>
+        <h3 style={{ margin: 0, marginBottom: 8 }}>
+          {hasReportees && activeTab === "team-leaves" ? "Team Leave Approvals" : "My Leaves"}
+        </h3>
+        <p className="muted">
+          {hasReportees && activeTab === "team-leaves" 
+            ? "Review and approve leave requests from your team" 
+            : "Apply for leave and track your leave balance"}
+        </p>
       </div>
 
-      {/* Leave Balance Section */}
-      <div
-        style={{
-          background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-          color: "white",
-          borderRadius: 12,
-          padding: 24,
+      {/* Tab Navigation for users with reportees */}
+      {hasReportees && (
+        <div style={{ 
+          display: "flex", 
+          gap: 8, 
           marginBottom: 24,
-          boxShadow: "0 4px 12px rgba(102, 126, 234, 0.3)",
-        }}
-      >
-        <div style={{ fontSize: 14, opacity: 0.9, marginBottom: 4 }}>
-          Total Leave Balance
+          borderBottom: "2px solid #e5e7eb"
+        }}>
+          <button
+            onClick={() => setActiveTab("my-leaves")}
+            style={{
+              padding: "12px 24px",
+              background: activeTab === "my-leaves" ? "white" : "transparent",
+              border: "none",
+              borderBottom: activeTab === "my-leaves" ? "3px solid #667eea" : "3px solid transparent",
+              color: activeTab === "my-leaves" ? "#667eea" : "#6b7280",
+              fontWeight: activeTab === "my-leaves" ? 600 : 400,
+              cursor: "pointer",
+              fontSize: 15,
+              transition: "all 0.2s"
+            }}
+          >
+            My Leaves
+          </button>
+          <button
+            onClick={() => setActiveTab("team-leaves")}
+            style={{
+              padding: "12px 24px",
+              background: activeTab === "team-leaves" ? "white" : "transparent",
+              border: "none",
+              borderBottom: activeTab === "team-leaves" ? "3px solid #667eea" : "3px solid transparent",
+              color: activeTab === "team-leaves" ? "#667eea" : "#6b7280",
+              fontWeight: activeTab === "team-leaves" ? 600 : 400,
+              cursor: "pointer",
+              fontSize: 15,
+              transition: "all 0.2s",
+              position: "relative"
+            }}
+          >
+            Team Leaves
+            {teamPendingLeaves.length > 0 && (
+              <span style={{
+                position: "absolute",
+                top: 8,
+                right: 8,
+                background: "#ef4444",
+                color: "white",
+                borderRadius: "50%",
+                width: 20,
+                height: 20,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 11,
+                fontWeight: 700
+              }}>
+                {teamPendingLeaves.length}
+              </span>
+            )}
+          </button>
         </div>
-        <div style={{ fontSize: 42, fontWeight: 700, marginBottom: 16 }}>
-          {totalBalance} days
-        </div>
-        
-        {balance && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
-            {/* Sick */}
-            <div style={{ background: "rgba(255, 255, 255, 0.2)", padding: 14, borderRadius: 8, border: "1px solid rgba(255, 255, 255, 0.3)" }}>
-              <div style={{ fontSize: 12, opacity: 0.9, marginBottom: 6 }}>🤒 Sick</div>
-              <div style={{ fontSize: 28, fontWeight: 700, marginBottom: 4 }}>{balance.sick} days</div>
-              <div style={{ fontSize: 10, opacity: 0.8, borderTop: "1px solid rgba(255, 255, 255, 0.2)", paddingTop: 6 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
-                  <span>Total:</span>
-                  <strong>{balance.sickTotal || 6} days</strong>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span>Used:</span>
-                  <strong>{(balance.sickTotal || 6) - balance.sick} days</strong>
-                </div>
-              </div>
+      )}
+
+      {/* CONDITIONAL RENDERING BASED ON ACTIVE TAB */}
+      {activeTab === "my-leaves" ? (
+        <>
+          {/* Leave Balance Section */}
+          <div
+            style={{
+              background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+              color: "white",
+              borderRadius: 12,
+              padding: 24,
+              marginBottom: 24,
+              boxShadow: "0 4px 12px rgba(102, 126, 234, 0.3)",
+            }}
+          >
+            <div style={{ fontSize: 14, opacity: 0.9, marginBottom: 4 }}>
+              Total Leave Balance
             </div>
-
-            {/* Planned */}
-            <div style={{ background: "rgba(255, 255, 255, 0.2)", padding: 14, borderRadius: 8, border: "1px solid rgba(255, 255, 255, 0.3)" }}>
-              <div style={{ fontSize: 12, opacity: 0.9, marginBottom: 6 }}>📅 Planned</div>
-              <div style={{ fontSize: 28, fontWeight: 700, marginBottom: 4 }}>{balance.planned} days</div>
-              <div style={{ fontSize: 10, opacity: 0.8, borderTop: "1px solid rgba(255, 255, 255, 0.2)", paddingTop: 6 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
-                  <span>Total:</span>
-                  <strong>{balance.plannedTotal || 12} days</strong>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span>Used:</span>
-                  <strong>{(balance.plannedTotal || 12) - balance.planned} days</strong>
-                </div>
-              </div>
+            <div style={{ fontSize: 42, fontWeight: 700, marginBottom: 16 }}>
+              {isIntern ? (balance?.sick || 0) : totalBalance} days
             </div>
-
-            {/* Optional Holiday */}
-            <div style={{ background: "rgba(255,255,255,0.2)", padding: 14, borderRadius: 8, border: "1px solid rgba(255,255,255,0.3)" }}>
-              <div style={{ fontSize: 12, opacity: 0.9, marginBottom: 6 }}>Optional</div>
-              <div style={{ fontSize: 28, fontWeight: 700, marginBottom: 4 }}>{balance.optional || 0} days</div>
-              <div style={{ fontSize: 10, opacity: 0.8, borderTop: "1px solid rgba(255,255,255,0.2)", paddingTop: 6 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
-                  <span>Total:</span>
-                  <strong>{balance.optionalTotal || 2} days</strong>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span>Used:</span>
-                  <strong>{(balance.optionalTotal || 2) - (balance.optional || 0)} days</strong>
-                </div>
-              </div>
-            </div>
-
-            {/* LWP */}
-            <div style={{ background: "rgba(255, 255, 255, 0.2)", padding: 14, borderRadius: 8, border: "1px solid rgba(255, 255, 255, 0.3)" }}>
-              <div style={{ fontSize: 12, opacity: 0.9, marginBottom: 6 }}>📋 LOP</div>
-              <div style={{ fontSize: 28, fontWeight: 700, marginBottom: 4 }}>{balance.lwp} days</div>
-              <div style={{ fontSize: 10, opacity: 0.8, borderTop: "1px solid rgba(255, 255, 255, 0.2)", paddingTop: 6 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
-                  <span>Total:</span>
-                  <strong>∞</strong>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span>Used:</span>
-                  <strong>{balance.lwp} days</strong>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* 👇👇👇 ADD THIS NEW SECTION BELOW 👇👇👇 */}
-      <div style={{
-        background: "#eff6ff",
-        padding: 16,
-        borderRadius: 12,
-        marginBottom: 24,
-        border: "1px solid #bfdbfe"
-      }}>
-        <div style={{ fontSize: 13, color: "#1e40af", marginBottom: 8, fontWeight: 600 }}>
-          📊 Leave Accrual Information
-        </div>
-        <div style={{ fontSize: 12, color: "#3b82f6", lineHeight: 1.6 }}>
-          • <strong>Planned Leave:</strong> 1 day credited every month<br/>
-          • <strong>Sick Leave:</strong> 0.5 days credited every month<br/>
-          • Accrual starts from your joining date ({balance?.monthsEmployed || 0} months employed)
-        </div>
-      </div>
-      {/* 👆👆👆 NEW SECTION ENDS HERE 👆👆👆 */}
-
-      {/* Apply Leave Section */}
-      <div
-        className="card"
-        style={{
-          padding: 24,
-          marginBottom: 24,
-          border: "1px solid #e5e7eb",
-        }}
-      >
-        <h4 style={{ marginTop: 0, marginBottom: 16 }}>Apply for Leave</h4>
-
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-          <div>
-            <label style={{ fontSize: 12, color: "#6b7280", display: "block", marginBottom: 4 }}>
-              Leave Type *
-            </label>
-            <select
-              className="input"
-              value={leave.leave_type}
-              onChange={(e) => setLeave({ ...leave, leave_type: e.target.value })}
-            >
-              <option>Sick</option>
-              <option>Planned</option>
-              <option>Optional</option>
-              <option>LWP</option>
-            </select>
-          </div>
-
-          <div>
-            <label style={{ fontSize: 12, color: "#6b7280", display: "block", marginBottom: 4 }}>
-              Start Date *
-            </label>
-            <input
-              className="input"
-              type="date"
-              value={leave.start_date}
-              onChange={(e) => setLeave({ ...leave, start_date: e.target.value })}
-            />
-          </div>
-
-          <div>
-            <label style={{ fontSize: 12, color: "#6b7280", display: "block", marginBottom: 4 }}>
-              End Date *
-            </label>
-            <input
-              className="input"
-              type="date"
-              value={leave.end_date}
-              onChange={(e) => setLeave({ ...leave, end_date: e.target.value })}
-            />
-          </div>
-
-          <div>
-            <label style={{ fontSize: 12, color: "#6b7280", display: "block", marginBottom: 4 }}>
-              Reason
-            </label>
-            <input
-              className="input"
-              placeholder="Reason for leave"
-              value={leave.reason}
-              onChange={(e) => setLeave({ ...leave, reason: e.target.value })}
-            />
-          </div>
-        </div>
-
-        <button
-          className="btn"
-          onClick={applyLeave}
-          disabled={loading || !leave.start_date || !leave.end_date}
-          style={{ width: "100%" }}
-        >
-          {loading ? "Submitting..." : "📝 Apply Leave"}
-        </button>
-      </div>
-
-      {/* Leave History */}
-      <div className="card" style={{ padding: 24, border: "1px solid #e5e7eb" }}>
-        <h4 style={{ marginTop: 0, marginBottom: 16 }}>
-          My Leave History ({history.length})
-        </h4>
-
-        {history.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "40px 20px", color: "#9ca3af" }}>
-            <div style={{ fontSize: 48, marginBottom: 12 }}>📋</div>
-            <div style={{ fontSize: 14 }}>No leave applications yet</div>
-          </div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {history.map((h) => {
-              const statusColors = getStatusColor(h.status);
-              const isPending = h.status === "Pending";
-              const isEditing = editingLeave?._id === h._id;
-
-              return (
-                <div
-                  key={h._id}
-                  className="card small"
-                  style={{
-                    padding: 16,
-                    border: `2px solid ${statusColors.border}`,
-                    background: statusColors.bg,
-                  }}
-                >
-                  {isEditing ? (
-                    <>
-                      <div style={{ marginBottom: 12 }}>
-                        <strong style={{ fontSize: 14 }}>Editing Leave Request</strong>
+            
+            {balance && (
+              <>
+                {isIntern ? (
+                  // INTERNS: ONLY Sick Leave Card
+                  <div style={{ maxWidth: 300 }}>
+                    <div style={{ background: "rgba(255, 255, 255, 0.2)", padding: 14, borderRadius: 8, border: "1px solid rgba(255, 255, 255, 0.3)" }}>
+                      <div style={{ fontSize: 12, opacity: 0.9, marginBottom: 6 }}>🤒 Sick</div>
+                      <div style={{ fontSize: 28, fontWeight: 700, marginBottom: 4 }}>{balance.sick || 0} days</div>
+                      <div style={{ fontSize: 10, opacity: 0.8, borderTop: "1px solid rgba(255, 255, 255, 0.2)", paddingTop: 6 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
+                          <span>Total:</span>
+                          <strong>{balance.sickTotal || 0} days</strong>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between" }}>
+                          <span>Used:</span>
+                          <strong>{(balance.sickTotal || 0) - (balance.sick || 0)} days</strong>
+                        </div>
                       </div>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-                        <div>
-                          <label style={{ fontSize: 12, color: "#6b7280", display: "block", marginBottom: 4 }}>
-                            Leave Type
-                          </label>
-                          <select
-                            className="input"
-                            value={editingLeave.leave_type}
-                            onChange={(e) => setEditingLeave({ ...editingLeave, leave_type: e.target.value })}
-                            style={{ fontSize: 13 }}
-                          >
-                            <option>Sick</option>
-                            <option>Planned</option>
-                            <option>LOP</option>
-                          </select>
+                    </div>
+                  </div>
+                ) : (
+                  // REGULAR EMPLOYEES: All Leave Cards
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
+                    {/* Sick */}
+                    <div style={{ background: "rgba(255, 255, 255, 0.2)", padding: 14, borderRadius: 8, border: "1px solid rgba(255, 255, 255, 0.3)" }}>
+                      <div style={{ fontSize: 12, opacity: 0.9, marginBottom: 6 }}>🤒 Sick</div>
+                      <div style={{ fontSize: 28, fontWeight: 700, marginBottom: 4 }}>{balance.sick} days</div>
+                      <div style={{ fontSize: 10, opacity: 0.8, borderTop: "1px solid rgba(255, 255, 255, 0.2)", paddingTop: 6 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
+                          <span>Total:</span>
+                          <strong>{balance.sickTotal || 6} days</strong>
                         </div>
-                        <div>
-                          <label style={{ fontSize: 12, color: "#6b7280", display: "block", marginBottom: 4 }}>
-                            Start Date
-                          </label>
-                          <input
-                            className="input"
-                            type="date"
-                            value={editingLeave.start_date}
-                            onChange={(e) => setEditingLeave({ ...editingLeave, start_date: e.target.value })}
-                            style={{ fontSize: 13 }}
-                          />
+                        <div style={{ display: "flex", justifyContent: "space-between" }}>
+                          <span>Used:</span>
+                          <strong>{(balance.sickTotal || 6) - balance.sick} days</strong>
                         </div>
-                        <div>
-                          <label style={{ fontSize: 12, color: "#6b7280", display: "block", marginBottom: 4 }}>
-                            End Date
-                          </label>
-                          <input
-                            className="input"
-                            type="date"
-                            value={editingLeave.end_date}
-                            onChange={(e) => setEditingLeave({ ...editingLeave, end_date: e.target.value })}
-                            style={{ fontSize: 13 }}
-                          />
+                      </div>
+                    </div>
+
+                    {/* Planned */}
+                    <div style={{ background: "rgba(255, 255, 255, 0.2)", padding: 14, borderRadius: 8, border: "1px solid rgba(255, 255, 255, 0.3)" }}>
+                      <div style={{ fontSize: 12, opacity: 0.9, marginBottom: 6 }}>📅 Planned</div>
+                      <div style={{ fontSize: 28, fontWeight: 700, marginBottom: 4 }}>{balance.planned} days</div>
+                      <div style={{ fontSize: 10, opacity: 0.8, borderTop: "1px solid rgba(255, 255, 255, 0.2)", paddingTop: 6 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
+                          <span>Total:</span>
+                          <strong>{balance.plannedTotal || 12} days</strong>
                         </div>
-                        <div>
-                          <label style={{ fontSize: 12, color: "#6b7280", display: "block", marginBottom: 4 }}>
-                            Reason
-                          </label>
-                          <input
-                            className="input"
-                            value={editingLeave.reason}
-                            onChange={(e) => setEditingLeave({ ...editingLeave, reason: e.target.value })}
-                            style={{ fontSize: 13 }}
-                          />
+                        <div style={{ display: "flex", justifyContent: "space-between" }}>
+                          <span>Used:</span>
+                          <strong>{(balance.plannedTotal || 12) - balance.planned} days</strong>
                         </div>
+                      </div>
+                    </div>
+
+                    {/* Optional Holiday */}
+                    <div style={{ background: "rgba(255,255,255,0.2)", padding: 14, borderRadius: 8, border: "1px solid rgba(255,255,255,0.3)" }}>
+                      <div style={{ fontSize: 12, opacity: 0.9, marginBottom: 6 }}>Optional</div>
+                      <div style={{ fontSize: 28, fontWeight: 700, marginBottom: 4 }}>{balance.optional || 0} days</div>
+                      <div style={{ fontSize: 10, opacity: 0.8, borderTop: "1px solid rgba(255,255,255,0.2)", paddingTop: 6 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
+                          <span>Total:</span>
+                          <strong>{balance.optionalTotal || 2} days</strong>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between" }}>
+                          <span>Used:</span>
+                          <strong>{(balance.optionalTotal || 2) - (balance.optional || 0)} days</strong>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* LWP */}
+                    <div style={{ background: "rgba(255, 255, 255, 0.2)", padding: 14, borderRadius: 8, border: "1px solid rgba(255, 255, 255, 0.3)" }}>
+                      <div style={{ fontSize: 12, opacity: 0.9, marginBottom: 6 }}>📋 LOP</div>
+                      <div style={{ fontSize: 28, fontWeight: 700, marginBottom: 4 }}>{balance.lwp} days</div>
+                      <div style={{ fontSize: 10, opacity: 0.8, borderTop: "1px solid rgba(255, 255, 255, 0.2)", paddingTop: 6 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 2 }}>
+                          <span>Total:</span>
+                          <strong>∞</strong>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between" }}>
+                          <span>Used:</span>
+                          <strong>{balance.lwp} days</strong>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Apply Leave Form */}
+          <div className="card" style={{ padding: 20, marginBottom: 24 }}>
+            <h4 style={{ marginTop: 0, marginBottom: 16 }}>Apply for Leave</h4>
+            
+            {message && (
+              <div style={{
+                padding: 12,
+                marginBottom: 16,
+                borderRadius: 8,
+                background: message.includes("Error") || message.includes("⚠️") ? "#fee2e2" : "#d1f4dd",
+                color: message.includes("Error") || message.includes("⚠️") ? "#dc2626" : "#0a5d2c",
+                border: `1px solid ${message.includes("Error") || message.includes("⚠️") ? "#fecaca" : "#7de3a6"}`,
+                fontSize: 14,
+                fontWeight: 500
+              }}>
+                {message}
+              </div>
+            )}
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16, marginBottom: 16 }}>
+              <div>
+                <label className="label">Leave Type</label>
+                <select
+                  className="input"
+                  value={leave.leave_type}
+                  onChange={(e) => {
+                    const newType = e.target.value;
+                    setLeave(prev => ({
+                      ...prev,
+                      leave_type: newType,
+                      is_half_day: newType === "Sick" ? prev.is_half_day : false,
+                      half_day_period: newType === "Sick" ? prev.half_day_period : "",
+                      start_date: "",
+                      end_date: "",
+                    }));
+                  }}
+                  disabled={isIntern}
+                >
+                  <option value="Sick">Sick Leave</option>
+                  {!isIntern && (
+                    <>
+                      <option value="Planned">Planned Leave</option>
+                      <option value="Optional">Optional Holiday</option>
+                      <option value="LWP">Leave Without Pay</option>
+                      <option value="Early Logout">Early Logout</option>
+                    </>
+                  )}
+                </select>
+              </div>
+
+              <div>
+                <label className="label">Start Date</label>
+                <input
+                  className="input"
+                  type="date"
+                  value={leave.start_date}
+                  onChange={(e) => handleDateClick(e, "start")}
+                  min={getMinDate()}
+                />
+              </div>
+
+              <div>
+                <label className="label">End Date</label>
+                <input
+                  className="input"
+                  type="date"
+                  value={leave.end_date}
+                  onChange={(e) => handleDateClick(e, "end")}
+                  min={leave.start_date || getMinDate()}
+                  disabled={leave.is_half_day}
+                />
+              </div>
+
+              {leave.leave_type === "Early Logout" && (
+                <div>
+                  <label className="label">Logout Time *</label>
+                  <input
+                    className="input"
+                    type="time"
+                    value={leave.logout_time}
+                    onChange={(e) => setLeave({ ...leave, logout_time: e.target.value })}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Planned Leave Warning Message */}
+            {leave.leave_type === "Planned" && !isIntern && (
+              <div style={{ 
+                marginBottom: 16, 
+                padding: 12, 
+                background: "#fef3c7", 
+                borderRadius: 8, 
+                border: "1px solid #fbbf24",
+                display: "flex",
+                gap: 10,
+                alignItems: "start"
+              }}>
+                <span style={{ fontSize: 18 }}>⚠️</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600, fontSize: 14, color: "#92400e", marginBottom: 4 }}>
+                    Planned Leave Policy
+                  </div>
+                  <div style={{ fontSize: 13, color: "#92400e" }}>
+                    Planned leave must be applied at least <strong>7 days in advance</strong>. 
+                    The calendar above will only allow you to select dates that are 7 or more days from today.
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Sick Leave Documentation Warning */}
+            {leave.leave_type === "Sick" && leave.start_date && leave.end_date && (
+              (() => {
+                const start = new Date(leave.start_date);
+                const end = new Date(leave.end_date);
+                const daysDiff = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
+                
+                // Adjust for half-day (0.5 days instead of 1)
+                const totalDays = leave.is_half_day ? 0.5 : daysDiff;
+                
+                if (totalDays > 2) {
+                  return (
+                    <div style={{ 
+                      marginBottom: 16, 
+                      padding: 12, 
+                      background: "#fee2e2", 
+                      borderRadius: 8, 
+                      border: "1px solid #ef4444",
+                      display: "flex",
+                      gap: 10,
+                      alignItems: "start"
+                    }}>
+                      <span style={{ fontSize: 18 }}>⚠️</span>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 600, fontSize: 14, color: "#991b1b", marginBottom: 4 }}>
+                          Medical Documentation Required
+                        </div>
+                        <div style={{ fontSize: 13, color: "#991b1b" }}>
+                          Sick leave exceeding <strong>2 days</strong> requires medical documentation 
+                          (such as a medical certificate). Please ensure you have the necessary documents 
+                          before applying for this leave.
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+                return null;
+              })()
+            )}
+
+            {/* Half-Day Option for Sick Leave */}
+            {leave.leave_type === "Sick" && (
+              <div style={{ marginBottom: 16, padding: 14, background: "#f9fafb", borderRadius: 8, border: "1px solid #e5e7eb" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={leave.is_half_day}
+                    onChange={(e) => handleHalfDayChange(e.target.checked)}
+                    style={{ width: 18, height: 18, cursor: "pointer" }}
+                  />
+                  <span style={{ fontWeight: 500, fontSize: 14 }}>This is a half-day leave</span>
+                </label>
+
+                {leave.is_half_day && (
+                  <div style={{ marginTop: 12 }}>
+                    <label className="label">Half-Day Period *</label>
+                    <div style={{ display: "flex", gap: 12 }}>
+                      <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                        <input
+                          type="radio"
+                          name="half_day_period"
+                          value="morning"
+                          checked={leave.half_day_period === "morning"}
+                          onChange={(e) => setLeave({ ...leave, half_day_period: e.target.value })}
+                          style={{ cursor: "pointer" }}
+                        />
+                        <span>Morning (First Half)</span>
+                      </label>
+                      <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                        <input
+                          type="radio"
+                          name="half_day_period"
+                          value="afternoon"
+                          checked={leave.half_day_period === "afternoon"}
+                          onChange={(e) => setLeave({ ...leave, half_day_period: e.target.value })}
+                          style={{ cursor: "pointer" }}
+                        />
+                        <span>Afternoon (Second Half)</span>
+                      </label>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div style={{ marginBottom: 16 }}>
+              <label className="label">
+                Reason <span style={{ color: "#ef4444", fontWeight: 600 }}>*</span>
+              </label>
+              <textarea
+                className="input"
+                value={leave.reason}
+                onChange={(e) => setLeave({ ...leave, reason: e.target.value })}
+                rows={3}
+                placeholder="Enter reason for leave (mandatory)"
+                required
+                style={{
+                  border: !leave.reason.trim() && message.includes("Reason") ? "1px solid #ef4444" : undefined
+                }}
+              />
+            </div>
+
+            <button
+              className="btn btn-primary"
+              onClick={applyLeave}
+              disabled={loading}
+              style={{ width: "100%" }}
+            >
+              {loading ? "Applying..." : "Apply for Leave"}
+            </button>
+          </div>
+
+          {/* Leave History Section */}
+          <div className="card" style={{ padding: 20 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <h4 style={{ margin: 0 }}>Leave History</h4>
+              <span style={{ fontSize: 14, color: "#6b7280" }}>
+                {displayHistory.length} of {history.length} records
+              </span>
+            </div>
+
+            {/* Search and Filter Controls */}
+            <div style={{ 
+              display: "grid", 
+              gridTemplateColumns: "2fr 1fr 1fr 1fr", 
+              gap: 12, 
+              marginBottom: 16,
+              padding: 16,
+              background: "#f9fafb",
+              borderRadius: 8,
+              border: "1px solid #e5e7eb"
+            }}>
+              <div>
+                <label className="label" style={{ fontSize: 12, marginBottom: 4 }}>Search</label>
+                <input
+                  type="text"
+                  className="input"
+                  placeholder="Search by type, status, reason..."
+                  value={historySearchTerm}
+                  onChange={(e) => setHistorySearchTerm(e.target.value)}
+                  style={{ fontSize: 14 }}
+                />
+              </div>
+
+              <div>
+                <label className="label" style={{ fontSize: 12, marginBottom: 4 }}>Status</label>
+                <select
+                  className="input"
+                  value={historyFilterStatus}
+                  onChange={(e) => setHistoryFilterStatus(e.target.value)}
+                  style={{ fontSize: 14 }}
+                >
+                  <option value="all">All Status</option>
+                  <option value="pending">Pending</option>
+                  <option value="approved">Approved</option>
+                  <option value="rejected">Rejected</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="label" style={{ fontSize: 12, marginBottom: 4 }}>Type</label>
+                <select
+                  className="input"
+                  value={historyFilterType}
+                  onChange={(e) => setHistoryFilterType(e.target.value)}
+                  style={{ fontSize: 14 }}
+                >
+                  <option value="all">All Types</option>
+                  <option value="sick">Sick</option>
+                  {!isIntern && (
+                    <>
+                      <option value="planned">Planned</option>
+                      <option value="optional">Optional</option>
+                      <option value="lwp">LWP</option>
+                      <option value="early logout">Early Logout</option>
+                    </>
+                  )}
+                </select>
+              </div>
+
+              <div>
+                <label className="label" style={{ fontSize: 12, marginBottom: 4 }}>Sort By</label>
+                <select
+                  className="input"
+                  value={historySortBy}
+                  onChange={(e) => setHistorySortBy(e.target.value)}
+                  style={{ fontSize: 14 }}
+                >
+                  <option value="newest">Newest First</option>
+                  <option value="oldest">Oldest First</option>
+                  <option value="start_date">Start Date</option>
+                  <option value="status">Status</option>
+                  <option value="type">Leave Type</option>
+                </select>
+              </div>
+            </div>
+
+            {/* History Table */}
+            {loading ? (
+              <div style={{ textAlign: "center", padding: 40, color: "#6b7280" }}>
+                Loading leave history...
+              </div>
+            ) : displayHistory.length === 0 ? (
+              <div style={{ textAlign: "center", padding: 40, color: "#6b7280" }}>
+                {history.length === 0 
+                  ? "No leave history found"
+                  : "No records match your filters"}
+              </div>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr style={{ background: "#f9fafb", borderBottom: "2px solid #e5e7eb" }}>
+                      <th style={{ padding: 12, textAlign: "left", fontSize: 13, fontWeight: 600 }}>Leave Type</th>
+                      <th style={{ padding: 12, textAlign: "left", fontSize: 13, fontWeight: 600 }}>Period</th>
+                      <th style={{ padding: 12, textAlign: "left", fontSize: 13, fontWeight: 600 }}>Days</th>
+                      <th style={{ padding: 12, textAlign: "left", fontSize: 13, fontWeight: 600 }}>Status</th>
+                      <th style={{ padding: 12, textAlign: "left", fontSize: 13, fontWeight: 600 }}>Applied On</th>
+                      <th style={{ padding: 12, textAlign: "left", fontSize: 13, fontWeight: 600 }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {displayHistory.map((item, idx) => {
+                      const statusStyle = getStatusColor(item.status);
+                      return (
+                        <tr key={idx} style={{ borderBottom: "1px solid #e5e7eb" }}>
+                          <td style={{ padding: 12, fontSize: 14 }}>
+                            <div style={{ fontWeight: 500 }}>{item.leave_type}</div>
+                            {item.is_half_day && (
+                              <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
+                                Half-day ({item.half_day_period})
+                              </div>
+                            )}
+                            {item.reason && (
+                              <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
+                                {item.reason}
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ padding: 12, fontSize: 13 }}>
+                            {formatDate(item.start_date)} - {formatDate(item.end_date)}
+                          </td>
+                          <td style={{ padding: 12, fontSize: 14, fontWeight: 500 }}>
+                            {item.days}
+                          </td>
+                          <td style={{ padding: 12 }}>
+                            <span style={{
+                              padding: "4px 12px",
+                              borderRadius: 16,
+                              fontSize: 12,
+                              fontWeight: 500,
+                              background: statusStyle.bg,
+                              color: statusStyle.text,
+                              border: `1px solid ${statusStyle.border}`
+                            }}>
+                              {item.status}
+                            </span>
+                          </td>
+                          <td style={{ padding: 12, fontSize: 13, color: "#6b7280" }}>
+                            {formatDate(item.applied_on)}
+                          </td>
+                          <td style={{ padding: 12 }}>
+                            {item.status === "Pending" && (
+                              <div style={{ display: "flex", gap: 8 }}>
+                                <button
+                                  className="btn btn-sm"
+                                  onClick={() => setEditingLeave(item)}
+                                  style={{ fontSize: 12, padding: "4px 12px" }}
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  className="btn btn-sm btn-danger"
+                                  onClick={() => cancelLeave(item._id)}
+                                  style={{ fontSize: 12, padding: "4px 12px" }}
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </>
+      ) : (
+        /* TEAM LEAVES TAB */
+        <div className="card" style={{ padding: 20 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <h4 style={{ margin: 0 }}>Pending Leave Requests</h4>
+            <span style={{ fontSize: 14, color: "#6b7280" }}>
+              {displayTeamLeaves.length} pending request{displayTeamLeaves.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+
+          {/* Team Search and Sort */}
+          <div style={{ 
+            display: "grid", 
+            gridTemplateColumns: "2fr 1fr", 
+            gap: 12, 
+            marginBottom: 16,
+            padding: 16,
+            background: "#f9fafb",
+            borderRadius: 8,
+            border: "1px solid #e5e7eb"
+          }}>
+            <div>
+              <label className="label" style={{ fontSize: 12, marginBottom: 4 }}>Search Employee</label>
+              <input
+                type="text"
+                className="input"
+                placeholder="Search by name, email, department..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={{ fontSize: 14 }}
+              />
+            </div>
+            <div>
+              <label className="label" style={{ fontSize: 12, marginBottom: 4 }}>Sort By</label>
+              <select
+                className="input"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                style={{ fontSize: 14 }}
+              >
+                <option value="newest">Newest First</option>
+                <option value="oldest">Oldest First</option>
+                <option value="name">Employee Name</option>
+                <option value="department">Department</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Team Leaves List */}
+          {displayTeamLeaves.length === 0 ? (
+            <div style={{ textAlign: "center", padding: 40, color: "#6b7280" }}>
+              {teamPendingLeaves.length === 0 
+                ? "No pending leave requests"
+                : "No requests match your search"}
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {displayTeamLeaves.map((teamLeave) => {
+                const isExpanded = expandedTeamLeave === teamLeave._id;
+                const isBirthday = isBirthdayLeave(teamLeave);
+
+                return (
+                  <div
+                    key={teamLeave._id}
+                    style={{
+                      border: "1px solid #e5e7eb",
+                      borderRadius: 8,
+                      padding: 16,
+                      background: isBirthday ? "#fef3c7" : "white",
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                          <h4 style={{ margin: 0, fontSize: 16 }}>
+                            {teamLeave.employee_name || "Unknown"}
+                          </h4>
+                          {isBirthday && (
+                            <span style={{
+                              background: "#fbbf24",
+                              color: "white",
+                              padding: "2px 8px",
+                              borderRadius: 12,
+                              fontSize: 11,
+                              fontWeight: 600
+                            }}>
+                              🎂 BIRTHDAY
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 8 }}>
+                          {teamLeave.employee_email}
+                          {teamLeave.employee_designation && ` • ${teamLeave.employee_designation}`}
+                          {teamLeave.employee_department && ` • ${teamLeave.employee_department}`}
+                        </div>
+                        <div style={{ fontSize: 14, marginBottom: 8 }}>
+                          <strong>{teamLeave.leave_type}</strong>
+                          {teamLeave.is_half_day && (
+                            <span style={{ marginLeft: 8, color: "#6b7280" }}>
+                              (Half-day - {teamLeave.half_day_period})
+                            </span>
+                          )}
+                          {" • "}
+                          {formatDate(teamLeave.start_date)} to {formatDate(teamLeave.end_date)}
+                          {" • "}
+                          <strong>{teamLeave.days} day{teamLeave.days !== 1 ? "s" : ""}</strong>
+                        </div>
+                        {teamLeave.reason && (
+                          <div style={{ 
+                            fontSize: 13, 
+                            color: "#374151",
+                            background: "#f3f4f6",
+                            padding: 8,
+                            borderRadius: 4,
+                            marginBottom: 8
+                          }}>
+                            <strong>Reason:</strong> {teamLeave.reason}
+                          </div>
+                        )}
                       </div>
                       <div style={{ display: "flex", gap: 8 }}>
                         <button
-                          onClick={updateLeave}
-                          disabled={loading}
-                          style={{
-                            flex: 1,
-                            background: "#10b981",
-                            color: "white",
-                            border: "none",
-                            padding: "8px",
-                            borderRadius: 6,
-                            fontSize: 13,
-                            fontWeight: 600,
-                            cursor: "pointer",
-                          }}
+                          className="btn btn-success btn-sm"
+                          onClick={() => updateTeamLeaveStatus(teamLeave._id, "Approved")}
+                          style={{ fontSize: 13, padding: "6px 16px" }}
                         >
-                          {loading ? "Saving..." : "💾 Save Changes"}
+                          ✓ Approve
                         </button>
                         <button
-                          onClick={() => setEditingLeave(null)}
-                          style={{
-                            flex: 1,
-                            background: "#6b7280",
-                            color: "white",
-                            border: "none",
-                            padding: "8px",
-                            borderRadius: 6,
-                            fontSize: 13,
-                            fontWeight: 600,
-                            cursor: "pointer",
-                          }}
+                          className="btn btn-danger btn-sm"
+                          onClick={() => handleTeamReject(teamLeave._id)}
+                          style={{ fontSize: 13, padding: "6px 16px" }}
                         >
-                          Cancel
+                          ✕ Reject
                         </button>
                       </div>
-                    </>
-                  ) : (
-                    // View Mode
-                    <>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
-                        <div>
-                          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                            <span style={{ fontSize: 20 }}>
-                              {h.leave_type === "Sick" ? "🤒" : h.leave_type === "Planned" ? "📅" : "📋"}
-                            </span>
-                            <strong style={{ fontSize: 16 }}>{h.leave_type} Leave</strong>
-                          </div>
-                          <div className="muted" style={{ fontSize: 13 }}>
-                            {formatDate(h.start_date)} to {formatDate(h.end_date)}
-                          </div>
-                          <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
-                            {h.days} {h.days === 1 ? "day" : "days"}
-                          </div>
-                        </div>
-                        <div style={{ textAlign: "right" }}>
-                          <div
-                            className="badge"
-                            style={{
-                              background: statusColors.text,
-                              color: "white",
-                              fontWeight: 600,
-                              padding: "6px 12px",
-                              marginBottom: 8,
-                            }}
-                          >
-                            {h.status}
-                          </div>
-                          {isPending && (
-                          <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
-                            {/* EDIT BUTTON */}
-                            <button
-                              onClick={() =>
-                                setEditingLeave({
-                                  _id: h._id,
-                                  leave_type: h.leave_type,
-                                  start_date: h.start_date,
-                                  end_date: h.end_date,
-                                  reason: h.reason || "",
-                                })
-                              }
-                              style={{
-                                background: "#3b82f6",
-                                color: "white",
-                                border: "none",
-                                padding: "6px 12px",
-                                borderRadius: 6,
-                                fontSize: 12,
-                                fontWeight: 600,
-                                cursor: "pointer",
-                              }}
-                            >
-                              ✏️ Edit
-                            </button>
-
-                            {/* CANCEL BUTTON */}
-                            <button
-                              onClick={() => cancelLeave(h._id)}
-                              style={{
-                                background: "#ef4444",
-                                color: "white",
-                                border: "none",
-                                padding: "6px 12px",
-                                borderRadius: 6,
-                                fontSize: 12,
-                                fontWeight: 600,
-                                cursor: "pointer",
-                              }}
-                            >
-                              ❌ Cancel
-                            </button>
-                          </div>
-                        )}
-                          <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>
-                            Applied: {formatDate(h.applied_on)}
-                          </div>
-                        </div>
-                      </div>
-
-                      {h.reason && (
-                        <div
-                          style={{
-                            marginTop: 8,
-                            padding: 10,
-                            background: "rgba(255, 255, 255, 0.7)",
-                            borderRadius: 6,
-                            fontSize: 13,
-                          }}
-                        >
-                          <strong>Reason:</strong> {h.reason}
-                        </div>
-                      )}
-
-                      {h.rejection_reason && (
-                        <div
-                          style={{
-                            marginTop: 8,
-                            padding: 10,
-                            background: "#fef2f2",
-                            borderRadius: 6,
-                            fontSize: 13,
-                            color: "#dc2626",
-                            border: "1px solid #fecaca",
-                          }}
-                        >
-                          <strong>✗ Rejection Reason:</strong> {h.rejection_reason}
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Message Display */}
-      {message && (
-        <div
-          style={{
-            position: "fixed",
-            bottom: 24,
-            right: 24,
-            background: message.includes("Error") || message.includes("⚠️") ? "#fef2f2" : "#d1f4dd",
-            color: message.includes("Error") || message.includes("⚠️") ? "#ef4444" : "#0a5d2c",
-            padding: "16px 24px",
+      {/* Edit Leave Modal */}
+      {editingLeave && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: "rgba(0,0,0,0.5)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: "white",
+            padding: 24,
             borderRadius: 12,
-            border: `2px solid ${message.includes("Error") || message.includes("⚠️") ? "#ffb3b3" : "#7de3a6"}`,
-            boxShadow: "0 8px 24px rgba(0, 0, 0, 0.15)",
-            fontSize: 14,
-            fontWeight: 600,
-            zIndex: 1000,
-          }}
-        >
-          {message}
+            maxWidth: 500,
+            width: "90%",
+            maxHeight: "90vh",
+            overflow: "auto"
+          }}>
+            <h4 style={{ marginTop: 0 }}>Edit Leave Request</h4>
+            
+            <div style={{ marginBottom: 16 }}>
+              <label className="label">Leave Type</label>
+              <select
+                className="input"
+                value={editingLeave.leave_type}
+                onChange={(e) => setEditingLeave({ ...editingLeave, leave_type: e.target.value })}
+                disabled={isIntern}
+              >
+                <option value="Sick">Sick Leave</option>
+                {!isIntern && (
+                  <>
+                    <option value="Planned">Planned Leave</option>
+                    <option value="Optional">Optional Holiday</option>
+                    <option value="LWP">Leave Without Pay</option>
+                  </>
+                )}
+              </select>
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <label className="label">Start Date</label>
+              <input
+                className="input"
+                type="date"
+                value={editingLeave.start_date}
+                onChange={(e) => setEditingLeave({ ...editingLeave, start_date: e.target.value })}
+              />
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <label className="label">End Date</label>
+              <input
+                className="input"
+                type="date"
+                value={editingLeave.end_date}
+                onChange={(e) => setEditingLeave({ ...editingLeave, end_date: e.target.value })}
+                disabled={editingLeave.is_half_day}
+              />
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <label className="label">Reason</label>
+              <textarea
+                className="input"
+                value={editingLeave.reason || ""}
+                onChange={(e) => setEditingLeave({ ...editingLeave, reason: e.target.value })}
+                rows={3}
+              />
+            </div>
+
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                className="btn btn-primary"
+                onClick={updateLeave}
+                disabled={loading}
+                style={{ flex: 1 }}
+              >
+                {loading ? "Updating..." : "Update Leave"}
+              </button>
+              <button
+                className="btn"
+                onClick={() => setEditingLeave(null)}
+                style={{ flex: 1 }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reject Modal */}
+      {rejectModal.show && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: "rgba(0,0,0,0.5)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: "white",
+            padding: 24,
+            borderRadius: 12,
+            maxWidth: 500,
+            width: "90%"
+          }}>
+            <h4 style={{ marginTop: 0, color: "#dc2626" }}>Reject Leave Request</h4>
+            
+            <div style={{ marginBottom: 16 }}>
+              <label className="label">Rejection Reason *</label>
+              <textarea
+                className="input"
+                value={rejectModal.reason}
+                onChange={(e) => setRejectModal({ ...rejectModal, reason: e.target.value })}
+                rows={4}
+                placeholder="Please provide a reason for rejection..."
+                autoFocus
+              />
+            </div>
+
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                className="btn btn-danger"
+                onClick={confirmTeamReject}
+                disabled={!rejectModal.reason.trim()}
+                style={{ flex: 1 }}
+              >
+                Confirm Rejection
+              </button>
+              <button
+                className="btn"
+                onClick={() => setRejectModal({ show: false, leaveId: null, reason: "" })}
+                style={{ flex: 1 }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

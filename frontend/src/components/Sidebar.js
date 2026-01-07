@@ -1,13 +1,15 @@
 // src/components/Sidebar.js
 import React from "react";
-import logo from "../assets/naxicon.png";   // ✅ IMPORT LOGO THE CORRECT WAY
+import logo from "../assets/naxicon.png";
 
 const Sidebar = ({ section, setSection, role, restricted = [] }) => {
   const buttons = [
     { key: "dashboard", label: "🏠 Dashboard", roles: ["Admin", "Manager", "Employee"] },
     { key: "employees", label: "👥 Employees", roles: ["Admin", "Manager"] },
     { key: "leaves", label: "📋 Leaves", roles: ["Admin", "Manager", "Employee"] },
-    { key: "tea-coffee", label: "☕ Tea/Coffee", roles: ["Admin", "Manager", "Employee"] },  // NEW
+    { key: "tea-coffee", label: "☕ Tea/Coffee", roles: ["Admin", "Manager", "Employee"] },
+    { key: "policy", label: "📄 Policy", roles: ["Admin", "Manager", "Employee"] },
+    { key: "projects", label: "📊 Projects", roles: ["Admin"] },
     { key: "apply-behalf", label: "📝 Apply Leave on Behalf", roles: ["Admin"] },
     { key: "logs", label: "📜 Change Logs", roles: ["Admin"] },
     { key: "add", label: "➕ Add Employee", roles: ["Admin"] },
@@ -21,7 +23,6 @@ const Sidebar = ({ section, setSection, role, restricted = [] }) => {
 
   return (
     <aside className="sidebar">
-
       <div
         className="brand"
         style={{
@@ -40,7 +41,6 @@ const Sidebar = ({ section, setSection, role, restricted = [] }) => {
           }}
         />
       </div>
-
       <nav className="nav" style={{ marginTop: 4 }}>
         {visibleButtons.map((btn) => (
           <button
@@ -52,12 +52,8 @@ const Sidebar = ({ section, setSection, role, restricted = [] }) => {
           </button>
         ))}
       </nav>
-
       <div className="footer">
         <div style={{ fontSize: 12 }}>© {new Date().getFullYear()} Naxrita</div>
-        <div style={{ fontSize: 12, color: "#9aa4b2", marginTop: 6 }}>
-          v1.0 • HR System
-        </div>
       </div>
     </aside>
   );

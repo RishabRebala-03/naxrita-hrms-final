@@ -1,6 +1,17 @@
 // frontend/src/components/Profile.js
 import React, { useState, useEffect } from "react";
 
+// 🔥 UNIVERSAL DATE SANITIZER — use this everywhere
+const cleanDate = (value) => {
+  if (!value) return null;
+
+  return String(value)
+    .replace(/\.\d+/, "")   // remove Python microseconds
+    .replace("Z", "")
+    .replace("+00:00", "")
+    .trim();
+};
+
 const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
   const [employeeId, setEmployeeId] = useState("");
   const [profile, setProfile] = useState(null);
@@ -11,12 +22,12 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [projectForm, setProjectForm] = useState({
     _id: null,
+    projectId: "",
     name: "",
     startDate: "",
     endDate: ""
   });
 
-  
   // Password change state
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [passwordForm, setPasswordForm] = useState({
@@ -25,60 +36,39 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
     confirmPassword: ""
   });
   const [passwordError, setPasswordError] = useState("");
+  const [availableProjects, setAvailableProjects] = useState([]);
+  const [selectedProjectId, setSelectedProjectId] = useState("");
 
   // Helper function to format date properly
   const formatDate = (dateValue) => {
     if (!dateValue) return "N/A";
 
     try {
-      let date;
+      const d = new Date(cleanDate(dateValue));
+      if (isNaN(d)) return "N/A";
 
-      if (typeof dateValue === "string") {
-        date = new Date(dateValue.replace("Z", "").replace(/\.\d{3}/, ""));
-      } else if (dateValue.$date) {
-        date = new Date(dateValue.$date);
-      } else {
-        date = new Date(dateValue);
-      }
-
-      if (isNaN(date.getTime())) {
-        return "N/A";
-      }
-
-      return date.toLocaleDateString("en-US", {
+      return d.toLocaleDateString("en-US", {
         year: "numeric",
         month: "short",
         day: "numeric",
       });
-    } catch (error) {
-      console.error("Date formatting error:", error);
+    } catch {
       return "N/A";
     }
   };
 
   // Helper to convert date to YYYY-MM-DD format for input
-  const dateToInputFormat = (dateValue) => {
-    if (!dateValue) return "";
+  const dateToInputFormat = (value) => {
+    if (!value) return "";
 
-    try {
-      let date;
-      if (typeof dateValue === "string") {
-        date = new Date(dateValue.replace("Z", "").replace(/\.\d{3}/, ""));
-      } else if (dateValue.$date) {
-        date = new Date(dateValue.$date);
-      } else {
-        date = new Date(dateValue);
-      }
+    const d = new Date(cleanDate(value));
+    if (isNaN(d)) return "";
 
-      if (isNaN(date.getTime())) return "";
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
 
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, "0");
-      const day = String(date.getDate()).padStart(2, "0");
-      return `${year}-${month}-${day}`;
-    } catch (error) {
-      return "";
-    }
+    return `${y}-${m}-${day}`;
   };
 
   // Helper to format project dates
@@ -96,69 +86,62 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
 
   // Calculate tenure from a start date until today
   const calculateTenure = (startDate) => {
-  if (!startDate) return "N/A";
+    if (!startDate) return "N/A";
 
-  // Normalize ANY backend date into a safe JS Date
-  let cleaned = startDate;
+    const d = new Date(cleanDate(startDate));
+    if (isNaN(d)) {
+      console.error("❌ Invalid start date received by tenure calculator:", startDate);
+      return "N/A";
+    }
 
-  if (typeof cleaned === "string") {
-    cleaned = cleaned.replace("Z", "").replace("+00:00", "");
-    cleaned = cleaned.replace(/\.\d{3}/, ""); // strip milliseconds
-  }
+    const today = new Date();
+    if (d > today) return "0 years 0 months 0 days";
 
-  const start = new Date(cleaned);
-  const today = new Date();
+    let years = today.getFullYear() - d.getFullYear();
+    let months = today.getMonth() - d.getMonth();
+    let days = today.getDate() - d.getDate();
 
-  if (isNaN(start.getTime())) {
-    console.error("❌ Invalid start date received by tenure calculator:", startDate);
-    return "N/A";
-  }
+    if (days < 0) {
+      months--;
+      days += new Date(today.getFullYear(), today.getMonth(), 0).getDate();
+    }
 
-  // If joining date is in future → tenure = 0
-  if (start > today) {
-    return "0y 0m 0d";
-  }
+    if (months < 0) {
+      years--;
+      months += 12;
+    }
 
-  let years = today.getFullYear() - start.getFullYear();
-  let months = today.getMonth() - start.getMonth();
-  let days = today.getDate() - start.getDate();
+    return `${years} years ${months} months ${days} days`;
+  };
 
-  if (days < 0) {
-    months -= 1;
-    const prevMonthDays = new Date(today.getFullYear(), today.getMonth(), 0).getDate();
-    days += prevMonthDays;
-  }
-
-  if (months < 0) {
-    years -= 1;
-    months += 12;
-  }
-
-  return `${years} years ${months} months ${days} days`;
+  const fetchAvailableProjects = async () => {
+    try {
+      const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/projects/`);
+      const data = await res.json();
+      setAvailableProjects(data);
+    } catch (err) {
+      console.error("Error fetching projects:", err);
+    }
   };
 
   const fetchProfile = async (userId) => {
-    // ✅ CRITICAL FIX: Validate userId before making API call
     if (!userId) {
       setMessage("No user ID provided");
       return;
     }
 
-    // ✅ Check if userId is actually a string, not an object
     if (typeof userId !== "string") {
       console.error("❌ fetchProfile received non-string userId:", userId);
       setMessage("Invalid user ID format");
       return;
     }
 
-    // ✅ Additional validation: check for "[object Object]" string
     if (userId === "[object Object]") {
       console.error("❌ fetchProfile received stringified object");
       setMessage("Invalid user ID");
       return;
     }
 
-    // ✅ MongoDB ObjectId validation (should be 24 hex characters)
     if (!/^[a-f0-9]{24}$/i.test(userId)) {
       console.error("❌ Invalid MongoDB ObjectId format:", userId);
       setMessage("Invalid user ID format");
@@ -191,7 +174,9 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
         shiftTimings: data.shiftTimings || "",
         dateOfJoining: dateToInputFormat(data.dateOfJoining),
         dateOfBirth: dateToInputFormat(data.dateOfBirth),
-        projects: data.projects || [],
+        projects: Array.isArray(data.projects)
+          ? data.projects.map(p => (p.name ? p.name : p)).join(", ")
+          : "",
         reportsToEmail: data.reportsToEmail || "",
         workLocation: data.workLocation || "",
         peopleLeadEmail: data.peopleLeadEmail || "",
@@ -212,15 +197,12 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
     console.log("   viewEmployeeId:", viewEmployeeId, "Type:", typeof viewEmployeeId);
     console.log("   user.id:", user?.id, "Type:", typeof user?.id);
 
-    // 1. Determine the Target ID
     if (viewEmployeeId) {
-      // Check if it's an object
       if (typeof viewEmployeeId === "object" && viewEmployeeId !== null) {
         console.warn("⚠️ viewEmployeeId is an object!");
         console.log("   Object keys:", Object.keys(viewEmployeeId));
         console.log("   Stringified:", JSON.stringify(viewEmployeeId, null, 2));
         
-        // Try multiple possible ID properties
         targetId = viewEmployeeId._id || 
                   viewEmployeeId.id || 
                   viewEmployeeId.employeeId ||
@@ -249,7 +231,6 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
         return;
       }
     } else if (user?.id) {
-      // Fallback to logged-in user
       targetId = user.id;
       console.log("✅ Using logged-in user ID:", targetId);
     } else {
@@ -259,7 +240,6 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
       return;
     }
 
-    // 2. Validate the extracted ID
     if (!targetId || typeof targetId !== "string") {
       console.error("❌ Invalid targetId after extraction:", targetId, "Type:", typeof targetId);
       setMessage("Invalid employee ID format");
@@ -267,7 +247,6 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
       return;
     }
 
-    // 3. Check for common error patterns
     if (targetId === "[object Object]" || targetId.includes("[object")) {
       console.error("❌ targetId contains object reference:", targetId);
       setMessage("Invalid employee ID: Stringified object detected");
@@ -275,7 +254,6 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
       return;
     }
 
-    // 4. Validate MongoDB ObjectId format (24 hex chars)
     if (!/^[a-f0-9]{24}$/i.test(targetId)) {
       console.error("❌ targetId is not a valid MongoDB ObjectId:", targetId);
       setMessage(`Invalid employee ID format: Expected 24 hex characters, got "${targetId}"`);
@@ -283,11 +261,14 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
       return;
     }
 
-    // 5. All validations passed - fetch profile
     console.log("✅ All validations passed, fetching profile for:", targetId);
     setEmployeeId(targetId);
     fetchProfile(targetId);
-  }, [viewEmployeeId, user]);
+
+    if (role === "Admin") {
+      fetchAvailableProjects();
+    }
+  }, [viewEmployeeId, user, role]);
 
   const handleManualFetch = () => {
     if (!employeeId.trim()) {
@@ -303,14 +284,16 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
   };
 
   const handleEditProject = (proj) => {
-  setProjectForm({
-    _id: proj._id,
-    name: proj.name,
-    startDate: proj.startDate,
-    endDate: proj.endDate || ""
-  });
-  setShowProjectModal(true);
-};
+    setProjectForm({
+      _id: proj._id,
+      projectId: proj.projectId,
+      name: proj.projectName || proj.name,
+      startDate: dateToInputFormat(proj.startDate),
+      endDate: proj.endDate ? dateToInputFormat(proj.endDate) : ""
+    });
+    setSelectedProjectId(proj.projectId ? String(proj.projectId) : "");
+    setShowProjectModal(true);
+  };
 
   const deleteProject = async (projectId) => {
     console.log("🗑️ deleteProject CALLED with:", projectId);
@@ -321,7 +304,7 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
       return;
     }
 
-    if (!window.confirm("Delete this project?")) return;
+    if (!window.confirm("Remove this project assignment?")) return;
 
     await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/users/delete_project/${employeeId}/${projectId}`, {
       method: "DELETE"
@@ -331,18 +314,52 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
   };
 
   const saveProject = async () => {
+    if (!selectedProjectId && !projectForm._id) {
+      setMessage("Please select a project");
+      return;
+    }
+    
+    if (!projectForm.startDate) {
+      setMessage("Please select a start date");
+      return;
+    }
+
     const url = projectForm._id
       ? `${process.env.REACT_APP_BACKEND_URL}/api/users/update_project/${employeeId}/${projectForm._id}`
       : `${process.env.REACT_APP_BACKEND_URL}/api/users/assign_project/${employeeId}`;
 
-    await fetch(url, {
-      method: projectForm._id ? "PUT" : "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(projectForm)
-    });
+    const payload = projectForm._id 
+      ? {
+          startDate: projectForm.startDate,
+          endDate: projectForm.endDate || null
+        }
+      : {
+          projectId: selectedProjectId,
+          startDate: projectForm.startDate,
+          endDate: projectForm.endDate || null
+        };
 
-    setShowProjectModal(false);
-    fetchProfile(employeeId);
+    try {
+      const res = await fetch(url, {
+        method: projectForm._id ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        setMessage("Project assignment updated ✓");
+        setShowProjectModal(false);
+        setSelectedProjectId("");
+        fetchProfile(employeeId);
+        setTimeout(() => setMessage(""), 3000);
+      } else {
+        setMessage(data.error || "Failed to save project");
+      }
+    } catch (err) {
+      setMessage("Network error");
+    }
   };
 
   const handleCancel = () => {
@@ -356,7 +373,7 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
       dateOfJoining: dateToInputFormat(profile.dateOfJoining),
       dateOfBirth: dateToInputFormat(profile.dateOfBirth),
       projects: Array.isArray(profile.projects)
-        ? profile.projects.join(", ")
+        ? profile.projects.map(p => p.name || "").join(", ")
         : "",
       reportsToEmail: profile.reportsToEmail || "",
       workLocation: profile.workLocation || "",
@@ -374,31 +391,45 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
         designation: editForm.designation,
         department: editForm.department,
         shiftTimings: editForm.shiftTimings,
-        projects: editForm.projects
-          .split(",")
-          .map((p) => p.trim())
-          .filter((p) => p),
         reportsToEmail: editForm.reportsToEmail || "", 
-        workLocation: editForm.workLocation || "",  // ← ADD THIS
+        workLocation: editForm.workLocation || "",
         peopleLeadEmail: editForm.peopleLeadEmail || "", 
       };
 
-      if (editForm.dateOfJoining) {
-        updateData.dateOfJoining = new Date(
-          editForm.dateOfJoining
-        ).toISOString();
+      if (editForm.dateOfBirth && editForm.dateOfBirth.trim() !== "") {
+          const dobValue = editForm.dateOfBirth.trim();
+          if (/^\d{4}-\d{2}-\d{2}$/.test(dobValue)) {
+              updateData.dateOfBirth = dobValue;
+              console.log("✅ Valid dateOfBirth:", updateData.dateOfBirth);
+          } else {
+              console.error("❌ Invalid dateOfBirth format:", dobValue);
+              setMessage("Invalid date of birth format");
+              setLoading(false);
+              return;
+          }
+      } else {
+          updateData.dateOfBirth = null;
+          console.log("⚠️ dateOfBirth set to null");
       }
 
-      // NEW FIELD - Date of Birth
-      if (editForm.dateOfBirth) {
-        updateData.dateOfBirth = new Date(
-          editForm.dateOfBirth
-        ).toISOString();
+      if (editForm.dateOfJoining && editForm.dateOfJoining.trim() !== "") {
+          const dojValue = editForm.dateOfJoining.trim();
+          if (/^\d{4}-\d{2}-\d{2}$/.test(dojValue)) {
+              updateData.dateOfJoining = dojValue;
+              console.log("✅ Valid dateOfJoining:", updateData.dateOfJoining);
+          } else {
+              console.error("❌ Invalid dateOfJoining format:", dojValue);
+              setMessage("Invalid date of joining format");
+              setLoading(false);
+              return;
+          }
+      } else {
+          updateData.dateOfJoining = null;
+          console.log("⚠️ dateOfJoining set to null");
       }
 
-      // ADD THIS DEBUG LINE
-      console.log("📤 Sending update data:", updateData);
-      console.log("📅 DOB from form:", editForm.dateOfBirth);
+      console.log("\n📤 FINAL updateData being sent to backend:");
+      console.log(JSON.stringify(updateData, null, 2));
 
       const res = await fetch(
         `${process.env.REACT_APP_BACKEND_URL}/api/users/update_user/${employeeId}`,
@@ -410,17 +441,22 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
       );
 
       const data = await res.json();
+      console.log("📥 Response from backend:", data);
 
       if (res.ok) {
         setMessage("Profile updated ✓");
+        setIsEditing(false);
         await fetchProfile(employeeId);
         
-        // Update parent state if this is own profile
         if (user?.id === employeeId && onUserUpdate) {
           const updatedUserRes = await fetch(
             `${process.env.REACT_APP_BACKEND_URL}/api/users/${employeeId}`
           );
           const updatedUser = await updatedUserRes.json();
+          console.log("📥 Updated user data:", updatedUser);
+          console.log("   dateOfBirth:", updatedUser.dateOfBirth);
+          console.log("   dateOfJoining:", updatedUser.dateOfJoining);
+          
           onUserUpdate({
             ...user,
             photoUrl: updatedUser.photoUrl
@@ -430,7 +466,7 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
         setMessage("Error: " + data.error);
       }
     } catch (err) {
-      console.error(err);
+      console.error("❌ Error in handleSave:", err);
       setMessage("Network error");
     } finally {
       setLoading(false);
@@ -447,14 +483,19 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
     setTimeout(() => setMessage(""), 2000);
   };
 
-  // Password change handlers
   const handlePasswordChange = async () => {
     setPasswordError("");
     
-    // Validation
-    if (!passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword) {
-      setPasswordError("All fields are required");
-      return;
+    if (role === "Admin" && !isOwnProfile) {
+      if (!passwordForm.newPassword || !passwordForm.confirmPassword) {
+        setPasswordError("New password and confirmation are required");
+        return;
+      }
+    } else {
+      if (!passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword) {
+        setPasswordError("All fields are required");
+        return;
+      }
     }
 
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
@@ -467,29 +508,38 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
       return;
     }
 
-    if (passwordForm.currentPassword === passwordForm.newPassword) {
+    if (isOwnProfile && passwordForm.currentPassword === passwordForm.newPassword) {
       setPasswordError("New password must be different from current password");
       return;
     }
 
     setLoading(true);
     try {
+      const requestBody = {
+        password: passwordForm.newPassword
+      };
+
+      if (isOwnProfile) {
+        requestBody.currentPassword = passwordForm.currentPassword;
+      }
+
       const res = await fetch(
         `${process.env.REACT_APP_BACKEND_URL}/api/users/update_user/${employeeId}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            password: passwordForm.newPassword,
-            currentPassword: passwordForm.currentPassword // For verification
-          }),
+          body: JSON.stringify(requestBody),
         }
       );
 
       const data = await res.json();
 
       if (res.ok) {
-        setMessage("Password changed successfully ✓");
+        setMessage(
+          role === "Admin" && !isOwnProfile 
+            ? `Password changed successfully for ${profile?.name} ✓`
+            : "Password changed successfully ✓"
+        );
         setShowPasswordModal(false);
         setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
         setTimeout(() => setMessage(""), 3000);
@@ -504,7 +554,6 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
     }
   };
 
-  // Determine if this is own profile or viewing someone else's
   const isOwnProfile = user?.id === employeeId;
   const canEdit = role === "Admin" || isOwnProfile;
   const showSearch = role === "Admin" && !viewEmployeeId;
@@ -528,10 +577,8 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
         </p>
       </div>
 
-      {/* Profile Display */}
       {profile && !isEditing && (
         <div style={{ marginTop: 20 }}>
-          {/* Header Card */}
           <div
             className="card"
             style={{
@@ -575,7 +622,6 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
                   <div style={{ fontSize: 14, opacity: 0.85 }}>
                     {profile.department || "No Department"}
                   </div>
-                  <br></br>
                   {profile.workLocation && (
                     <div style={{ marginTop: 16 }}>
                       <div
@@ -584,7 +630,7 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
                           marginBottom: 4,
                           textTransform: "uppercase",
                           letterSpacing: "0.5px",
-                          color: "rgba(255, 255, 255, 0.7)" // Fixes readability
+                          color: "rgba(255, 255, 255, 0.7)"
                         }}
                       >
                         Work Location
@@ -610,7 +656,6 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
             </div>
           </div>
 
-          {/* Details Grid */}
           <div
             style={{
               display: "grid",
@@ -618,7 +663,6 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
               gap: 20,
             }}
           >
-            {/* Contact Information */}
             <div className="card" style={{ padding: 20 }}>
               <h4 style={{ marginTop: 0, marginBottom: 16 }}>
                 Contact Information
@@ -674,7 +718,20 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
               </div>
             </div>
 
-            {/* Work Information */}
+            <div className="card" style={{ padding: 20 }}>
+              <h4 style={{ marginTop: 0, marginBottom: 16 }}>
+                Personal Information
+              </h4>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <div>
+                  <div className="muted" style={{ fontSize: 12, marginBottom: 4 }}>
+                    Date of Birth
+                  </div>
+                  <div>{formatDate(profile.dateOfBirth)}</div>
+                </div>
+              </div>
+            </div>
+
             <div className="card" style={{ padding: 20 }}>
               <h4 style={{ marginTop: 0, marginBottom: 16 }}>
                 Work Information
@@ -691,16 +748,6 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
                   </div>
                   <div>{profile.shiftTimings || "Not Set"}</div>
                 </div>
-                
-                <div>
-                  <div
-                    className="muted"
-                    style={{ fontSize: 12, marginBottom: 4 }}
-                  >
-                    Date of Birth
-                  </div>
-                  <div>{formatDate(profile.dateOfBirth)}</div>
-                </div>
 
                 <div>
                   <div
@@ -712,42 +759,39 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
                   <div>{formatDate(profile.dateOfJoining)}</div>
                     
                   <div style={{ marginTop: 4, fontSize: 13, color: "#10b981" }}>
-                    Tenure: {calculateTenure(profile.dateOfJoining.$date || profile.dateOfJoining)}
+                    Tenure: {calculateTenure(profile.dateOfJoining)}
                   </div>
-
-                  <br></br>
-                  {profile.reportsToEmail && ( 
-                  <div> 
-                    <div className="muted" style={{ fontSize: 12, marginBottom: 4 }}>Reports To</div> 
-                    <div>{profile.reportsToEmail}</div> 
-                  </div>
-                  )} 
-                  <br></br>
-                  {/* --- START: ADD THIS MISSING CODE --- */}
-                  {profile.peopleLeadEmail && (
-                    <div style={{ marginTop: 8 }}>
-                      <div className="muted" style={{ fontSize: 12, marginBottom: 4 }}>
-                        People Lead
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span>{profile.peopleLeadEmail}</span>
-                        <button
-                          className="btn ghost"
-                          style={{ padding: "4px 8px", fontSize: 12 }}
-                          onClick={() => copyToClipboard(profile.peopleLeadEmail, "People Lead Email")}
-                        >
-                          Copy
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                  {/* --- END: ADD THIS MISSING CODE --- */}
                 </div>
-                <br></br>
+
+                {profile.reportsToEmail && (
+                  <div>
+                    <div className="muted" style={{ fontSize: 12, marginBottom: 4 }}>
+                      Reports To
+                    </div>
+                    <div>{profile.reportsToEmail}</div>
+                  </div>
+                )}
+
+                {profile.peopleLeadEmail && (
+                  <div>
+                    <div className="muted" style={{ fontSize: 12, marginBottom: 4 }}>
+                      Talent Lead
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span>{profile.peopleLeadEmail}</span>
+                      <button
+                        className="btn ghost"
+                        style={{ padding: "4px 8px", fontSize: 12 }}
+                        onClick={() => copyToClipboard(profile.peopleLeadEmail, "People Lead Email")}
+                      >
+                        Copy
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Projects */}
             <div className="card" style={{ padding: 20 }}>
               <h4 style={{ marginTop: 0, marginBottom: 16 }}>Projects</h4>
 
@@ -755,7 +799,14 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
                 <button
                   className="btn"
                   onClick={() => {
-                    setProjectForm({ _id: null, name: "", startDate: "", endDate: "" });
+                    setProjectForm({ 
+                      _id: null, 
+                      projectId: "",
+                      name: "", 
+                      startDate: dateToInputFormat(new Date()),
+                      endDate: "" 
+                    });
+                    setSelectedProjectId("");
                     setShowProjectModal(true);
                   }}
                   style={{ marginBottom: 12 }}
@@ -774,7 +825,6 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
                     const startDate = new Date(proj.startDate);
                     const endDate = proj.endDate ? new Date(proj.endDate) : new Date();
 
-                    // if invalid, skip duration
                     let duration = "N/A";
 
                     if (!isNaN(startDate) && !isNaN(endDate)) {
@@ -784,8 +834,8 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
                       const days = totalDays % 30;
 
                       duration = proj.endDate
-                        ? `${months}months ${days}days`
-                        : `Ongoing • ${months}months ${days}days`;
+                        ? `${months} months ${days} days`
+                        : `Ongoing • ${months} months ${days} days`;
                     }
                     return (
                       <div 
@@ -797,19 +847,16 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
                           background: proj.endDate ? "#f3f4f6" : "#ecfdf5"
                         }}
                       >
-                        <strong style={{ fontSize: 16 }}>{proj.name}</strong>
+                        <strong style={{ fontSize: 16 }}>{proj.projectName || proj.name}</strong>
 
-                        {/* Dates */}
                         <div style={{ fontSize: 13, marginTop: 4, color: "#6b7280" }}>
                           {formatProjectDate(proj.startDate)} → {formatProjectDate(proj.endDate)}
                         </div>
 
-                        {/* Duration */}
                         <div style={{ fontSize: 13, marginTop: 4, color: "#10b981" }}>
                           {duration}
                         </div>
 
-                        {/* Admin Controls */}
                         {role === "Admin" && (
                           <div style={{ marginTop: 8, display: "flex", gap: 10 }}>
                             <button
@@ -836,8 +883,6 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
               )}
             </div>
 
-
-            {/* Leave Balance */}
             <div className="card" style={{ padding: 20 }}>
               <h4 style={{ marginTop: 0, marginBottom: 16 }}>Leave Balance</h4>
               {profile.leaveBalance ? (
@@ -867,13 +912,12 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
             </div>
           </div>
 
-          {/* Action Buttons - Only show if user can edit */}
           {canEdit && (
             <div style={{ marginTop: 24, display: "flex", gap: 12 }}>
               <button className="btn" onClick={handleEdit}>
                 ✏️ Edit Profile
               </button>
-              {isOwnProfile && (
+              {(isOwnProfile || role === "Admin") && (
                 <button 
                   className="btn ghost" 
                   onClick={() => setShowPasswordModal(true)}
@@ -911,7 +955,6 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
 
                 const file = e.target.files[0];
 
-                // Optional: Size limit check (2 MB)
                 if (file.size > 2 * 1024 * 1024) {
                   setMessage("Error: File size must be under 2 MB");
                   return;
@@ -943,7 +986,6 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
         </div>
       )}
 
-      {/* Edit Mode */}
       {profile && isEditing && (
         <div style={{ marginTop: 20 }}>
           <h4 style={{ marginBottom: 16 }}>Edit Profile Information</h4>
@@ -1106,7 +1148,6 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
               />
             </div>
 
-            {/* Only show for Admin */}
             {role === "Admin" && (
               <>
                 <div>
@@ -1125,7 +1166,6 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
             )}
           </div>
 
-          {/* Only show for Admin */}
           {role === "Admin" && (
             <div>
               <label style={{ fontSize: 12, color: "#6b7280", display: "block", marginBottom: 4 }}>
@@ -1143,7 +1183,6 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
 
           <br></br>
 
-          {/* Action Buttons */}
           <div style={{ display: "flex", gap: 12 }}>
             <button
               className="btn"
@@ -1168,7 +1207,6 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
         </div>
       )}
 
-      {/* Password Change Modal */}
       {showPasswordModal && (
         <div
           style={{
@@ -1204,23 +1242,27 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
               🔒 Change Password
             </h3>
             <p style={{ marginBottom: 24, fontSize: 14, color: "#6b7280" }}>
-              Enter your current password and choose a new one
+              {role === "Admin" && !isOwnProfile
+                ? `Set a new password for ${profile?.name}`
+                : "Enter your current password and choose a new one"}
             </p>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              <div>
-                <label style={{ fontSize: 12, color: "#6b7280", display: "block", marginBottom: 4 }}>
-                  Current Password *
-                </label>
-                <input
-                  className="input"
-                  type="password"
-                  placeholder="Enter current password"
-                  value={passwordForm.currentPassword}
-                  onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
-                  autoFocus
-                />
-              </div>
+              {isOwnProfile && (
+                <div>
+                  <label style={{ fontSize: 12, color: "#6b7280", display: "block", marginBottom: 4 }}>
+                    Current Password *
+                  </label>
+                  <input
+                    className="input"
+                    type="password"
+                    placeholder="Enter current password"
+                    value={passwordForm.currentPassword}
+                    onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+                    autoFocus
+                  />
+                </div>
+              )}
 
               <div>
                 <label style={{ fontSize: 12, color: "#6b7280", display: "block", marginBottom: 4 }}>
@@ -1232,6 +1274,7 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
                   placeholder="Enter new password (min 6 characters)"
                   value={passwordForm.newPassword}
                   onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                  autoFocus={!isOwnProfile}
                 />
               </div>
 
@@ -1279,7 +1322,12 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
               <button
                 className="btn"
                 onClick={handlePasswordChange}
-                disabled={loading || !passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword}
+                disabled={
+                  loading || 
+                  !passwordForm.newPassword || 
+                  !passwordForm.confirmPassword ||
+                  (isOwnProfile && !passwordForm.currentPassword)
+                }
                 style={{
                   background: loading ? "#cbd5e1" : "#667eea",
                   cursor: loading ? "not-allowed" : "pointer",
@@ -1295,41 +1343,120 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
       {showProjectModal && (
         <div className="overlay">
           <div className="modal">
-            <h3>{projectForm._id ? "Edit Project" : "Assign Project"}</h3>
+            <h3>{projectForm._id ? "Edit Project Assignment" : "Assign Project"}</h3>
 
-            <label>Project Name</label>
-            <input
-              className="input"
-              value={projectForm.name}
-              onChange={(e) => setProjectForm({ ...projectForm, name: e.target.value })}
-            />
+            {!projectForm._id ? (
+              <>
+                <label>Select Project *</label>
+                <select
+                  className="input"
+                  value={selectedProjectId}
+                  onChange={(e) => {
+                    setSelectedProjectId(e.target.value);
+                    const selected = availableProjects.find(p => p._id === e.target.value);
+                    if (selected) {
+                      setProjectForm({ 
+                        ...projectForm, 
+                        name: selected.title,
+                        projectId: selected._id 
+                      });
+                    }
+                  }}
+                  style={{
+                    width: "100%",
+                    padding: 12,
+                    border: "1px solid #e5e7eb",
+                    borderRadius: 8,
+                    fontSize: 14,
+                    marginBottom: 16
+                  }}
+                >
+                  <option value="">-- Select a Project --</option>
+                  {availableProjects.map((proj) => (
+                    <option key={proj._id} value={proj._id}>
+                      {proj.projectId} - {proj.title}
+                    </option>
+                  ))}
+                </select>
+
+                {selectedProjectId && (
+                  <div style={{
+                    padding: 12,
+                    background: "#f9fafb",
+                    borderRadius: 8,
+                    marginBottom: 16,
+                    fontSize: 14,
+                    color: "#6b7280"
+                  }}>
+                    <div style={{ marginBottom: 4 }}>
+                      <strong>Project:</strong> {projectForm.name}
+                    </div>
+                    {availableProjects.find(p => p._id === selectedProjectId)?.description && (
+                      <div>
+                        <strong>Description:</strong>{" "}
+                        {availableProjects.find(p => p._id === selectedProjectId).description}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <label>Project Name</label>
+                <input
+                  className="input"
+                  value={projectForm.name}
+                  disabled
+                  style={{
+                    background: "#f3f4f6",
+                    cursor: "not-allowed",
+                    marginBottom: 16
+                  }}
+                />
+              </>
+            )}
           
-            <label>Start Date</label>
+            <label>Employee's Start Date *</label>
             <input
               className="input"
               type="date"
               value={projectForm.startDate}
               onChange={(e) => setProjectForm({ ...projectForm, startDate: e.target.value })}
+              style={{ marginBottom: 16 }}
             />
 
-            <label>End Date</label>
+            <label>Employee's End Date (Leave empty if ongoing)</label>
             <input
               className="input"
               type="date"
               value={projectForm.endDate}
               onChange={(e) => setProjectForm({ ...projectForm, endDate: e.target.value })}
+              min={projectForm.startDate}
+              style={{ marginBottom: 16 }}
             />
 
             <div style={{ marginTop: 16, display: "flex", gap: 12 }}>
-              <button className="btn" onClick={saveProject}>Save</button>
-              <button className="btn ghost" onClick={() => setShowProjectModal(false)}>Cancel</button>
+              <button 
+                className="btn" 
+                onClick={saveProject}
+                disabled={!selectedProjectId && !projectForm._id}
+              >
+                {projectForm._id ? "Update" : "Assign"}
+              </button>
+              <button 
+                className="btn ghost" 
+                onClick={() => {
+                  setShowProjectModal(false);
+                  setSelectedProjectId("");
+                }}
+              >
+                Cancel
+              </button>
             </div>
           </div>
         </div>
       )}
 
-
-      {/* Message Display */}
       {message && (
         <div
           style={{
@@ -1351,7 +1478,6 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
         </div>
       )}
 
-      {/* Loading State */}
       {loading && !profile && (
         <div
           style={{

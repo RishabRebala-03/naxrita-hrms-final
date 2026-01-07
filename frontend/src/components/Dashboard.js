@@ -3,7 +3,22 @@ import axios from "axios";
 import OrganizationHierarchy from "./OrganizationHierarchy";
 import diwaliBanner from "../assets/diwali.png";
 import AdminHolidays from "./AdminHolidays";
-import BannerImage from "../assets/banner.png";
+import BannerImage from "../assets/banner.jpg";
+
+
+const getTimeBasedGreeting = () => {
+  const hour = new Date().getHours();
+  
+  if (hour >= 5 && hour < 12) {
+    return "Good Morning";
+  } else if (hour >= 12 && hour < 17) {
+    return "Good Afternoon";
+  } else if (hour >= 17 && hour < 21) {
+    return "Good Evening";
+  } else {
+    return "Good Night";
+  }
+};
 
 
 const AdminDashboard = ({ user }) => {
@@ -24,37 +39,115 @@ const AdminDashboard = ({ user }) => {
   const fetchAdminData = async () => {
     try {
       setLoading(true);
-      const [usersRes, leavesRes] = await Promise.all([
-        axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/users/`),
-        axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/leaves/all`),
-      ]);
 
-      const users = usersRes.data;
-      const leaves = leavesRes.data;
-      const pending = leaves.filter((l) => l.status === "Pending");
+      console.log("🔍 Fetching admin dashboard data");
 
-      const today = new Date().toISOString().split("T")[0];
-      const onLeaveToday = leaves.filter((l) => {
-        if (l.status !== "Approved") return false;
-        return l.start_date <= today && l.end_date >= today;
+      // Fetch all employees
+      const employeesRes = await axios.get(
+        `${process.env.REACT_APP_BACKEND_URL}/api/users/get_all_employees`
+      );
+
+      // CRITICAL FIX: Same validation
+      let allEmployees = [];
+      if (Array.isArray(employeesRes.data)) {
+        allEmployees = employeesRes.data;
+      } else {
+        console.error("❌ Unexpected employees response:", employeesRes.data);
+      }
+
+      console.log("✅ All employees fetched:", allEmployees.length);
+      allEmployees = allEmployees.filter(emp => emp && emp._id);
+
+      // ⭐ FIX: Use the admin-specific endpoint
+      // Get ALL admin user IDs first
+      const adminsRes = await axios.get(
+        `${process.env.REACT_APP_BACKEND_URL}/api/users/`
+      );
+      const admins = adminsRes.data.filter(u => u.role === "Admin");
+      const adminIds = admins.map(a => a._id);
+
+      console.log("✅ Found admin IDs:", adminIds);
+
+      // CRITICAL: Get ALL pending leaves
+      const allPendingRes = await axios.get(
+        `${process.env.REACT_APP_BACKEND_URL}/api/leaves/all`
+      );
+
+      // CRITICAL: Filter for leaves where current_approver_id matches ANY admin
+      const pending = allPendingRes.data.filter(leave => {
+        const isForAdmin = adminIds.includes(leave.current_approver_id);
+        const isPending = leave.status === "Pending";
+        
+        if (isForAdmin && isPending) {
+          console.log("✅ Admin pending leave found:", {
+            employee: leave.employee_name,
+            escalation_level: leave.escalation_level,
+            current_approver_id: leave.current_approver_id
+          });
+        }
+        
+        return isForAdmin && isPending;
       });
 
-      setStats({
-        totalEmployees: users.length,
-        pendingLeaves: pending.length,
-        onLeaveToday: onLeaveToday.length,
-        workingToday: users.length - onLeaveToday.length,
-      });
-
+      console.log("✅ Admin pending leaves found:", pending.length);
       setPendingLeaves(pending);
-      const recent = leaves
-        .filter((l) => l.status !== "Pending")
-        .sort((a, b) => new Date(b.applied_on) - new Date(a.applied_on))
+
+      // Fetch all leaves to get recent actions
+      const allLeavesRes = await axios.get(
+        `${process.env.REACT_APP_BACKEND_URL}/api/leaves/all`
+      );
+      const allLeaves = allLeavesRes.data || [];
+      console.log("✅ All leaves fetched:", allLeaves.length);
+
+      // Get recent actions (last 5 approved/rejected leaves)
+      const recent = allLeaves
+        .filter(leave => leave.status !== "Pending")
+        .sort((a, b) => {
+          const dateA = a.approved_on || a.rejected_on || a.applied_on;
+          const dateB = b.approved_on || b.rejected_on || b.applied_on;
+          return new Date(dateB) - new Date(dateA);
+        })
         .slice(0, 5);
       setRecentActions(recent);
+
+      // Calculate who's on leave today
+      const today = new Date().toISOString().split('T')[0];
+      const onLeaveToday = allLeaves.filter((l) => {
+        if (l.status !== "Approved") return false;
+        const startDate = l.start_date;
+        const endDate = l.end_date;
+        return startDate <= today && endDate >= today;
+      });
+
+      const workingToday = Math.max(0, allEmployees.length - onLeaveToday.length);
+
+      console.log("📊 Stats calculated:", {
+        totalEmployees: allEmployees.length,
+        pendingLeaves: pending.length,
+        onLeaveToday: onLeaveToday.length,
+        workingToday: workingToday
+      });
+
+      // ⭐ FIX: Set all stats together
+      setStats({
+        totalEmployees: allEmployees.length,
+        pendingLeaves: pending.length,
+        onLeaveToday: onLeaveToday.length,
+        workingToday: workingToday,
+      });
+
     } catch (err) {
-      console.error("Error loading dashboard:", err);
-      setMessage("Failed to load data");
+      console.error("❌ Error loading admin dashboard:", err);
+      console.error("Error details:", err.response?.data || err.message);
+      setMessage("Failed to load dashboard data");
+      
+      // Set empty stats on error
+      setStats({
+        totalEmployees: 0,
+        pendingLeaves: 0,
+        onLeaveToday: 0,
+        workingToday: 0,
+      });
     } finally {
       setLoading(false);
     }
@@ -214,7 +307,7 @@ const AdminDashboard = ({ user }) => {
                     textShadow: "0 2px 4px rgba(0,0,0,0.1)",
                   }}
                 >
-                  Welcome back, {user?.name?.split(" ")[0] || "Admin"} 👋
+                  {getTimeBasedGreeting()}, {user?.name?.split(" ")[0] || "Admin"} 👋
                 </h1>
                 <p
                   style={{

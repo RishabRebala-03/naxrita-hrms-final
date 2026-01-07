@@ -1,16 +1,11 @@
 from datetime import datetime
 from config.db import mongo
 
+# In year_end_reset.py, update the function:
 def reset_sick_leaves_new_year():
-    """
-    Resets sick leave balance to total at the start of each year.
-    Planned leaves are carried forward (not reset).
-    This should run on January 1st at midnight.
-    """
     try:
         print("🔄 Running year-end leave reset...")
         
-        # Get all users
         users = list(mongo.db.users.find())
         
         reset_count = 0
@@ -21,17 +16,24 @@ def reset_sick_leaves_new_year():
                 # Reset sick leave to total
                 sick_total = balance.get("sickTotal", 6)
                 
-                # Keep planned leave as-is (carry forward)
-                # Update the balance
+                # ⭐ NEW: Reset optional leaves to 2
+                optional_total = balance.get("optionalTotal", 2)
+                
+                # Keep planned leave but cap at 12
+                planned = balance.get("planned", 0)
+                capped_planned = min(planned, 12)  # ⭐ Cap at 12
+                
                 mongo.db.users.update_one(
                     {"_id": user["_id"]},
                     {"$set": {
                         "leaveBalance.sick": sick_total,
+                        "leaveBalance.optional": optional_total,  # ⭐ Reset optional
+                        "leaveBalance.planned": capped_planned,   # ⭐ Cap planned at 12
                         "leaveBalance.lastResetDate": datetime.utcnow()
                     }}
                 )
                 reset_count += 1
-                print(f"✅ Reset sick leave for {user.get('name', 'Unknown')} to {sick_total}")
+                print(f"✅ Reset leaves for {user.get('name', 'Unknown')} - Sick: {sick_total}, Optional: {optional_total}, Planned: {capped_planned}")
         
         print(f"✅ Year-end reset complete! Reset {reset_count} users")
         return {"success": True, "reset_count": reset_count}

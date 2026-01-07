@@ -13,18 +13,81 @@ const AdminLeaves = ({ user }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState("newest"); // newest, oldest, name, department
   const [approveModal, setApproveModal] = useState({ show: false, leaveId: null, approverName: "" });
+  const [partialApprovalModal, setPartialApprovalModal] = useState({
+  show: false,
+  leaveId: null,
+  originalStart: "",
+  originalEnd: "",
+  approvedStart: "",
+  approvedEnd: "",
+  approverName: ""
+  });
+
+  // ========== ⭐ NEW ESCALATION HELPER FUNCTION ⭐ ==========
+  const getEscalationInfo = (leave) => {
+    const escalationLevel = leave.escalation_level || 0;
+    const appliedOn = new Date(leave.applied_on);
+    const now = new Date();
+    const daysPending = Math.floor((now - appliedOn) / (1000 * 60 * 60 * 24));
+    
+    if (escalationLevel === 0) {
+      const daysUntilEscalation = Math.max(0, 2 - daysPending);
+      return {
+        level: "Manager",
+        status: daysPending >= 2 ? "overdue" : "pending",
+        message: daysPending >= 2 
+          ? "⚠️ Overdue - Will escalate soon"
+          : `⏱️ ${daysUntilEscalation} day${daysUntilEscalation !== 1 ? 's' : ''} until escalation`,
+        color: daysPending >= 2 ? "#dc2626" : "#f59e0b"
+      };
+    } else if (escalationLevel === 1) {
+      return {
+        level: "Admin (Escalated)",
+        status: "escalated",
+        message: "⚠️ Escalated after 2-day timeout",
+        color: "#dc2626"
+      };
+    }
+    return null;
+  };
+  // ========== END OF HELPER FUNCTION ==========
 
   const fetchLeaves = async () => {
     try {
       setLoading(true);
-      const res = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/leaves/all`);
-      const leaves = res.data;
+      console.log("🔍 Fetching admin leaves...");
       
-      setPendingLeaves(leaves.filter(l => l.status === "Pending"));
-      setAllLeaves(leaves.sort((a, b) => new Date(b.applied_on) - new Date(a.applied_on)));
+      // ⭐ FIX: Fetch admin-specific pending leaves using the correct endpoint
+      const pendingRes = await axios.get(
+        `${process.env.REACT_APP_BACKEND_URL}/api/leaves/pending/admin`
+      );
+      console.log("✅ Admin pending leaves response:", pendingRes.data);
+      
+      // ⭐ FIX: Fetch all leaves for the "All Leaves" tab
+      const allRes = await axios.get(
+        `${process.env.REACT_APP_BACKEND_URL}/api/leaves/all`
+      );
+      console.log("✅ All leaves response:", allRes.data.length);
+      
+      // ⭐ CRITICAL FIX: Use the pending/admin endpoint data for Pending tab
+      const adminPending = Array.isArray(pendingRes.data) ? pendingRes.data : [];
+      const allLeaves = Array.isArray(allRes.data) ? allRes.data : [];
+      
+      console.log(`📊 Admin pending leaves: ${adminPending.length}`);
+      console.log(`📊 All leaves: ${allLeaves.length}`);
+      
+      // ⭐ FIX: Set the correct data to the correct state
+      setPendingLeaves(adminPending);  // Only escalated admin leaves
+      setAllLeaves(allLeaves.sort((a, b) => new Date(b.applied_on) - new Date(a.applied_on)));
+      
+      console.log(`✅ State updated: ${adminPending.length} in Pending tab, ${allLeaves.length} in All tab`);
     } catch (err) {
-      console.error("Error fetching leaves:", err);
+      console.error("❌ Error fetching leaves:", err);
+      console.error("Error details:", err.response?.data);
       setMessage("Failed to load leaves");
+      
+      setPendingLeaves([]);
+      setAllLeaves([]);
     } finally {
       setLoading(false);
     }
@@ -67,8 +130,17 @@ const AdminLeaves = ({ user }) => {
     }
   };
 
-  const handleApprove = (leaveId) => {
-    setApproveModal({ show: true, leaveId, approverName: "" });
+  const handleApprove = (leave) => {
+    // Open modal with date range
+    setPartialApprovalModal({
+      show: true,
+      leaveId: leave._id,
+      originalStart: leave.start_date,
+      originalEnd: leave.end_date,
+      approvedStart: leave.start_date, // Default to full approval
+      approvedEnd: leave.end_date,
+      approverName: ""
+    });
   };
 
   const handleReject = (leaveId) => {
@@ -83,6 +155,27 @@ const AdminLeaves = ({ user }) => {
     await updateStatus(approveModal.leaveId, "Approved", "", approveModal.approverName);
   };
 
+  const confirmPartialApproval = async () => {
+    if (!partialApprovalModal.approverName.trim()) {
+      setMessage("Please enter the approver's name");
+      return;
+    }
+
+    const isPartial = 
+      partialApprovalModal.approvedStart !== partialApprovalModal.originalStart ||
+      partialApprovalModal.approvedEnd !== partialApprovalModal.originalEnd;
+
+    await updateStatus(
+      partialApprovalModal.leaveId,
+      "Approved",
+      "",
+      partialApprovalModal.approverName,
+      isPartial,
+      partialApprovalModal.approvedStart,
+      partialApprovalModal.approvedEnd
+    );
+  };
+
   const confirmReject = async () => {
     if (!rejectModal.reason.trim()) {
       setMessage("Please enter a rejection reason");
@@ -91,34 +184,60 @@ const AdminLeaves = ({ user }) => {
     await updateStatus(rejectModal.leaveId, "Rejected", rejectModal.reason);
   };
 
-  const updateStatus = async (leaveId, status, rejectionReason = "", approverName = "") => {
-  try {
-    const payload = { status };
-    if (status === "Rejected" && rejectionReason.trim()) {
-      payload.rejection_reason = rejectionReason;
-    }
-    if (status === "Approved" && approverName.trim()) {
-      payload.approved_by = approverName;
-      payload.approved_on = new Date().toISOString();
-    }
+  const updateStatus = async (
+    leaveId, 
+    status, 
+    rejectionReason = "", 
+    approverName = "",
+    isPartial = false,
+    approvedStart = null,
+    approvedEnd = null
+  ) => {
+    try {
+      const payload = { status };
+      
+      if (status === "Rejected" && rejectionReason.trim()) {
+        payload.rejection_reason = rejectionReason;
+      }
+      
+      if (status === "Approved" && approverName.trim()) {
+        payload.approved_by = approverName;
+        payload.approved_on = new Date().toISOString();
+        
+        // Add partial approval data
+        if (isPartial) {
+          payload.is_partial = true;
+          payload.approved_start_date = approvedStart;
+          payload.approved_end_date = approvedEnd;
+        }
+      }
 
-    const res = await axios.put(
-      `${process.env.REACT_APP_BACKEND_URL}/api/leaves/update_status/${leaveId}`,
-      payload
-    );
+      const res = await axios.put(
+        `${process.env.REACT_APP_BACKEND_URL}/api/leaves/update_status/${leaveId}`,
+        payload
+      );
 
-    if (res.status === 200) {
-      setMessage(`Leave ${status.toLowerCase()} successfully ✓`);
-      setRejectModal({ show: false, leaveId: null, reason: "" });
-      setApproveModal({ show: false, leaveId: null, approverName: "" });
-      fetchLeaves();
+      if (res.status === 200) {
+        setMessage(`Leave ${status.toLowerCase()} successfully ✓`);
+        setRejectModal({ show: false, leaveId: null, reason: "" });
+        setApproveModal({ show: false, leaveId: null, approverName: "" });
+        setPartialApprovalModal({ 
+          show: false, 
+          leaveId: null, 
+          originalStart: "", 
+          originalEnd: "", 
+          approvedStart: "", 
+          approvedEnd: "",
+          approverName: ""
+        });
+        fetchLeaves();
+        setTimeout(() => setMessage(""), 3000);
+      }
+    } catch (err) {
+      console.error(err);
+      setMessage("Error updating leave status");
       setTimeout(() => setMessage(""), 3000);
     }
-  } catch (err) {
-    console.error(err);
-    setMessage("Error updating leave status");
-    setTimeout(() => setMessage(""), 3000);
-  }
   };
 
   const getStatusColor = (status) => {
@@ -294,6 +413,23 @@ const AdminLeaves = ({ user }) => {
                       <div style={{ fontSize: 16, fontWeight: 700, color: "#111827" }}>
                         {leave.employee_name || "Unknown"}
 
+                        {/* ⭐ ESCALATION BADGE */}
+                        {leave.escalation_level === 1 && (
+                          <span
+                            style={{
+                              marginLeft: 8,
+                              background: "#dc2626",
+                              color: "white",
+                              padding: "4px 10px",
+                              borderRadius: 6,
+                              fontSize: 12,
+                              fontWeight: 600,
+                            }}
+                          >
+                            ⚠️ ESCALATED
+                          </span>
+                        )}
+
                         {/* 🎂 BIRTHDAY BADGE */}
                         {isBirthdayLeave(leave) && (
                           <span
@@ -380,6 +516,46 @@ const AdminLeaves = ({ user }) => {
                       {leave.days} {leave.days === 1 ? "day" : "days"}
                     </span>
                   </div>
+
+                  {/* ⭐ ESCALATION STATUS BOX */}
+                  {leave.status === "Pending" && (() => {
+                    const escalationInfo = getEscalationInfo(leave);
+                    if (!escalationInfo) return null;
+                    
+                    return (
+                      <div style={{
+                        marginTop: 12,
+                        padding: "12px 16px",
+                        background: escalationInfo.status === "escalated" ? "#fef2f2" : "#fffbeb",
+                        borderRadius: 8,
+                        border: `2px solid ${escalationInfo.status === "escalated" ? "#fca5a5" : "#fcd34d"}`,
+                      }}>
+                        <div style={{ 
+                          display: "flex", 
+                          alignItems: "center", 
+                          gap: 8,
+                          marginBottom: 6
+                        }}>
+                          <span style={{ fontSize: 18 }}>
+                            {escalationInfo.status === "escalated" ? "⚠️" : "📊"}
+                          </span>
+                          <div style={{ 
+                            fontWeight: 600, 
+                            color: escalationInfo.color,
+                            fontSize: 14
+                          }}>
+                            Approval Level: {escalationInfo.level}
+                          </div>
+                        </div>
+                        <div style={{ 
+                          color: escalationInfo.color,
+                          fontSize: 13 
+                        }}>
+                          {escalationInfo.message}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {expandedLeave === leave._id && (
@@ -442,7 +618,7 @@ const AdminLeaves = ({ user }) => {
                 {isPending && (
                   <div style={{ display: "flex", gap: 8 }}>
                     <button
-                      onClick={() => handleApprove(leave._id)}
+                      onClick={() => handleApprove(leave)}
                       style={{
                         flex: 1,
                         background: "#10b981",
@@ -688,6 +864,251 @@ const AdminLeaves = ({ user }) => {
                   fontSize: 14,
                   fontWeight: 600,
                   cursor: approveModal.approverName.trim() ? "pointer" : "not-allowed",
+                  minWidth: 150,
+                }}
+              >
+                Confirm Approval
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Partial Approval Modal */}
+      {partialApprovalModal.show && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0,0,0,0.6)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+          }}
+          onClick={() => setPartialApprovalModal({ 
+            show: false, 
+            leaveId: null, 
+            originalStart: "", 
+            originalEnd: "", 
+            approvedStart: "", 
+            approvedEnd: "",
+            approverName: ""
+          })}
+        >
+          <div
+            style={{
+              background: "white",
+              padding: 32,
+              borderRadius: 16,
+              maxWidth: 600,
+              width: "90%",
+              boxShadow: "0 25px 50px rgba(0, 0, 0, 0.4)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ marginTop: 0, marginBottom: 8, color: "#10b981", fontSize: 22 }}>
+              ✓ Approve Leave Request
+            </h3>
+            <p style={{ marginBottom: 24, fontSize: 14, color: "#6b7280" }}>
+              You can approve the entire leave period or select specific dates
+            </p>
+
+            {/* Original Date Range Display */}
+            <div style={{ 
+              background: "#eff6ff", 
+              padding: 16, 
+              borderRadius: 8, 
+              marginBottom: 20,
+              border: "1px solid #bfdbfe"
+            }}>
+              <div style={{ fontSize: 12, color: "#1e40af", marginBottom: 8, fontWeight: 600 }}>
+                📅 Requested Leave Period
+              </div>
+              <div style={{ fontSize: 14, color: "#3b82f6", fontWeight: 500 }}>
+                {formatDate(partialApprovalModal.originalStart)} → {formatDate(partialApprovalModal.originalEnd)}
+              </div>
+              <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>
+                ({(() => {
+                  const start = new Date(partialApprovalModal.originalStart);
+                  const end = new Date(partialApprovalModal.originalEnd);
+                  return (Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1);
+                })()} days total)
+              </div>
+            </div>
+
+            {/* Approved Date Range Selection */}
+            <div style={{ marginBottom: 24 }}>
+              <label style={{ 
+                fontSize: 13, 
+                color: "#374151", 
+                display: "block", 
+                marginBottom: 8,
+                fontWeight: 600 
+              }}>
+                Approve Date Range *
+              </label>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div>
+                  <label style={{ fontSize: 11, color: "#6b7280", display: "block", marginBottom: 4 }}>
+                    Start Date
+                  </label>
+                  <input
+                    type="date"
+                    value={partialApprovalModal.approvedStart}
+                    min={partialApprovalModal.originalStart}
+                    max={partialApprovalModal.originalEnd}
+                    onChange={(e) => setPartialApprovalModal({ 
+                      ...partialApprovalModal, 
+                      approvedStart: e.target.value 
+                    })}
+                    style={{
+                      width: "100%",
+                      padding: "12px 16px",
+                      fontSize: 14,
+                      border: "2px solid #e5e7eb",
+                      borderRadius: 8,
+                      outline: "none",
+                      fontFamily: "inherit",
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = "#10b981"}
+                    onBlur={(e) => e.target.style.borderColor = "#e5e7eb"}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, color: "#6b7280", display: "block", marginBottom: 4 }}>
+                    End Date
+                  </label>
+                  <input
+                    type="date"
+                    value={partialApprovalModal.approvedEnd}
+                    min={partialApprovalModal.approvedStart || partialApprovalModal.originalStart}
+                    max={partialApprovalModal.originalEnd}
+                    onChange={(e) => setPartialApprovalModal({ 
+                      ...partialApprovalModal, 
+                      approvedEnd: e.target.value 
+                    })}
+                    style={{
+                      width: "100%",
+                      padding: "12px 16px",
+                      fontSize: 14,
+                      border: "2px solid #e5e7eb",
+                      borderRadius: 8,
+                      outline: "none",
+                      fontFamily: "inherit",
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = "#10b981"}
+                    onBlur={(e) => e.target.style.borderColor = "#e5e7eb"}
+                  />
+                </div>
+              </div>
+              
+              {/* Show calculated days */}
+              {partialApprovalModal.approvedStart && partialApprovalModal.approvedEnd && (
+                <div style={{ 
+                  marginTop: 8, 
+                  padding: "8px 12px", 
+                  background: "#f0fdf4",
+                  borderRadius: 6,
+                  border: "1px solid #86efac",
+                  fontSize: 12,
+                  color: "#166534"
+                }}>
+                  ✓ Approving {(() => {
+                    const start = new Date(partialApprovalModal.approvedStart);
+                    const end = new Date(partialApprovalModal.approvedEnd);
+                    return (Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1);
+                  })()} day(s)
+                  {partialApprovalModal.approvedStart !== partialApprovalModal.originalStart ||
+                  partialApprovalModal.approvedEnd !== partialApprovalModal.originalEnd ? (
+                    <span style={{ fontWeight: 600 }}> (Partial Approval)</span>
+                  ) : (
+                    <span style={{ fontWeight: 600 }}> (Full Approval)</span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Approver Name */}
+            <div style={{ marginBottom: 24 }}>
+              <label style={{ 
+                fontSize: 13, 
+                color: "#374151", 
+                display: "block", 
+                marginBottom: 8,
+                fontWeight: 600 
+              }}>
+                Approver Name *
+              </label>
+              <input
+                type="text"
+                placeholder="Enter your full name (e.g., John Doe - CEO)"
+                value={partialApprovalModal.approverName}
+                onChange={(e) => setPartialApprovalModal({ 
+                  ...partialApprovalModal, 
+                  approverName: e.target.value 
+                })}
+                style={{
+                  width: "100%",
+                  padding: "12px 16px",
+                  fontSize: 14,
+                  border: "2px solid #e5e7eb",
+                  borderRadius: 8,
+                  outline: "none",
+                  fontFamily: "inherit",
+                }}
+                onFocus={(e) => e.target.style.borderColor = "#10b981"}
+                onBlur={(e) => e.target.style.borderColor = "#e5e7eb"}
+              />
+            </div>
+
+            {/* Action Buttons */}
+            <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
+              <button
+                onClick={() => setPartialApprovalModal({ 
+                  show: false, 
+                  leaveId: null, 
+                  originalStart: "", 
+                  originalEnd: "", 
+                  approvedStart: "", 
+                  approvedEnd: "",
+                  approverName: ""
+                })}
+                style={{
+                  background: "#f3f4f6",
+                  color: "#374151",
+                  border: "none",
+                  padding: "10px 20px",
+                  borderRadius: 8,
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  minWidth: 100,
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmPartialApproval}
+                disabled={!partialApprovalModal.approverName.trim() || 
+                        !partialApprovalModal.approvedStart || 
+                        !partialApprovalModal.approvedEnd}
+                style={{
+                  background: (partialApprovalModal.approverName.trim() && 
+                              partialApprovalModal.approvedStart && 
+                              partialApprovalModal.approvedEnd) ? "#10b981" : "#cbd5e1",
+                  color: "white",
+                  border: "none",
+                  padding: "10px 20px",
+                  borderRadius: 8,
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: (partialApprovalModal.approverName.trim() && 
+                          partialApprovalModal.approvedStart && 
+                          partialApprovalModal.approvedEnd) ? "pointer" : "not-allowed",
                   minWidth: 150,
                 }}
               >

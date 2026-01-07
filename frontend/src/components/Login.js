@@ -12,27 +12,33 @@ const Login = ({ onLoginSuccess }) => {
   const handleLogin = async () => {
     setError("");
     setLoading(true);
-
+    
     if (!credentials.email || !credentials.password) {
       setError("Please enter both email and password");
       setLoading(false);
       return;
     }
-
+    
     try {
       const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(credentials),
       });
-
+      
       const data = await response.json();
-
+      
       if (response.ok) {
-        onLoginSuccess({
+        const userData = {
           ...data.user,
           photoUrl: data.user?.photoUrl || null,   
-        });
+        };
+        
+        // ✅ CRITICAL: Save to localStorage
+        localStorage.setItem('user', JSON.stringify(userData));
+        console.log('💾 Session saved to localStorage');
+        
+        onLoginSuccess(userData);
       } else {
         setError(data.error || "Invalid credentials");
       }

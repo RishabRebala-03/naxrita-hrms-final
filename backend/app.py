@@ -1,3 +1,7 @@
+# =============================================================================
+# UPDATED app.py - WITH LEAVE ESCALATION SCHEDULER
+# =============================================================================
+
 from flask import Flask, request, jsonify
 from config.db import init_db
 from routes.user_routes import user_bp
@@ -10,39 +14,39 @@ from utils.leave_accrual import accrue_monthly_leaves
 from utils.year_end_reset import reset_sick_leaves_new_year 
 from routes.tea_coffee_routes import tea_coffee_bp
 from flask_cors import CORS 
+from routes.notification_routes import notification_bp
+from routes.project_routes import project_bp
+import requests
 
 app = Flask(__name__, static_url_path="/static", static_folder="static")
 
-# ✅ SIMPLIFIED CORS CONFIGURATION
+# SIMPLIFIED CORS CONFIGURATION
 CORS(app, 
      resources={r"/api/*": {
-         "origins": ["http://localhost:3000"],
+         "origins": ["http://192.168.1.131:3000"],
          "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
          "allow_headers": ["Content-Type", "Authorization"],
          "supports_credentials": True
      }})
 
 @app.before_request
-def log_request():
+def before_all_requests():
     print(f"\n📥 Incoming {request.method} request to {request.path}")
     print(f"   Origin: {request.headers.get('Origin')}")
-
-@app.before_request
-def handle_preflight():
+    # Handle OPTIONS preflight
     if request.method == 'OPTIONS':
         print("✅ Handling OPTIONS/preflight request")
         response = jsonify({'status': 'ok'})
-        response.headers['Access-Control-Allow-Origin'] = 'http://localhost:3000'  # ✅ CHANGED FROM '*'
+        response.headers['Access-Control-Allow-Origin'] = 'http://192.168.1.131:3000'
         response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
         response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
         response.headers['Access-Control-Allow-Credentials'] = 'true'
-        response.headers['Access-Control-Max-Age'] = '3600'
         return response, 200
 
 @app.after_request
 def after_request(response):
     print(f"📤 Sending response with status {response.status_code}")
-    response.headers['Access-Control-Allow-Origin'] = 'http://localhost:3000'
+    response.headers['Access-Control-Allow-Origin'] = 'http://192.168.1.131:3000'
     response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
     response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
     response.headers['Access-Control-Allow-Credentials'] = 'true'
@@ -53,18 +57,108 @@ init_db(app)
 
 # Register routes
 app.register_blueprint(user_bp, url_prefix="/api/users")
-app.register_blueprint(leave_bp, url_prefix="/api/leaves")  # ✅ NEW
+app.register_blueprint(leave_bp, url_prefix="/api/leaves")
 app.register_blueprint(auth_bp, url_prefix="/api/auth")
-app.register_blueprint(holiday_bp, url_prefix="/api/holidays") # ✅ NEW
+app.register_blueprint(holiday_bp, url_prefix="/api/holidays")
 app.register_blueprint(log_bp, url_prefix="/api/logs")
 app.register_blueprint(tea_coffee_bp, url_prefix="/api/tea_coffee")
+app.register_blueprint(notification_bp, url_prefix="/api/notifications")
+app.register_blueprint(project_bp, url_prefix="/api/projects")
 
+
+# ========== ⭐ NEW ESCALATION FUNCTION - ADD HERE ⭐ ==========
+def check_leave_escalations():
+    """Call the escalation check endpoint"""
+    try:
+        print("\n🔔 Running scheduled escalation check...")
+        response = requests.post('http://192.168.1.131:5000/api/leaves/check_escalations')
+        
+        if response.status_code == 200:
+            data = response.json()
+            escalated = data.get('escalated_count', 0)
+            total = data.get('total_pending', 0)
+            
+            print(f"✅ Escalation check completed:")
+            print(f"   - Total pending leaves: {total}")
+            print(f"   - Escalated to admin: {escalated}")
+        else:
+            print(f"⚠️ Escalation check failed with status: {response.status_code}")
+            
+    except Exception as e:
+        print(f"❌ Escalation check error: {str(e)}")
+# ========== END OF NEW FUNCTION ==========
+
+
+# =============================================================================
+# INITIALIZE SCHEDULER WITH ALL JOBS
+# =============================================================================
 scheduler = BackgroundScheduler()
-# Monthly leave accrual (1st of every month)
-scheduler.add_job(func=accrue_monthly_leaves, trigger="cron", day=1, hour=0, minute=1)
-# Year-end sick leave reset (January 1st at midnight)
-scheduler.add_job(func=reset_sick_leaves_new_year, trigger="cron", month=1, day=1, hour=0, minute=0)
+
+# 1. Monthly leave accrual (1st of every month at 12:01 AM)
+scheduler.add_job(
+    func=accrue_monthly_leaves, 
+    trigger="cron", 
+    day=1, 
+    hour=0, 
+    minute=1,
+    id="monthly_accrual"
+)
+
+# 2. Year-end sick leave reset (January 1st at midnight)
+scheduler.add_job(
+    func=reset_sick_leaves_new_year, 
+    trigger="cron", 
+    month=1, 
+    day=1, 
+    hour=0, 
+    minute=0,
+    id="yearly_reset"
+)
+
+# 3. ⭐ ESCALATION CHECK - TEST MODE (every 5 minutes)
+# PRODUCTION MODE (9 AM daily)
+scheduler.add_job(
+    func=check_leave_escalations, 
+    trigger="cron",
+    hour=9,
+    minute=0,
+    id="daily_escalation"
+)
+
+print("⚠️ ESCALATION CHECK: Running every 5 minutes (TEST MODE)")
+print("   Change to 'hour=9' for production")
+
+# Start the scheduler
 scheduler.start()
 
+print("\n" + "="*80)
+print("✅ SCHEDULER STARTED WITH 3 AUTOMATED JOBS")
+print("="*80)
+print("\n📋 SCHEDULED JOBS:")
+print("-" * 80)
+print("1️⃣  MONTHLY LEAVE ACCRUAL")
+print("    Schedule: 1st of every month at 12:01 AM")
+print("    Function: Accrue sick (0.5) and planned (1.0) leaves for all employees")
+print()
+print("2️⃣  YEAR-END SICK LEAVE RESET")
+print("    Schedule: January 1st at 12:00 AM")
+print("    Function: Reset unused sick leaves for new year")
+print()
+print("3️⃣  ⭐ LEAVE ESCALATION CHECK")
+print("    Schedule: Every day at 9:00 AM")
+print("    Function: Escalate pending leaves after 2-day timeout")
+print("    Logic:")
+print("      - Level 0 (Manager): Wait 2 days → Escalate to Admin")
+print("      - Level 1 (Admin): Final approval (no further escalation)")
+print("-" * 80)
+print()
+
 if __name__ == "__main__":
-    app.run(debug=True, host='127.0.0.1', port=5000)
+    try:
+        print("🚀 Starting Flask application on http://192.168.1.131:5000")
+        print("="*80 + "\n")
+        app.run(debug=True, host='192.168.1.131', port=5000)
+    except (KeyboardInterrupt, SystemExit):
+        scheduler.shutdown()
+        print("\n✅ Scheduler shutdown complete")
+        print("👋 Application stopped gracefully")

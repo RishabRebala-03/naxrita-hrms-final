@@ -1,9 +1,24 @@
-// src/components/EmployeeDashboard.js
+// src/components/EmployeeDashboard.js - COMPLETE FIX
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import OrganizationHierarchy from "./OrganizationHierarchy";
 import LeaveStatusDot from './LeaveStatusDot';
-import BannerImage from "../assets/banner.png";
+import BannerImage from "../assets/banner.jpg";
+
+
+const getTimeBasedGreeting = () => {
+  const hour = new Date().getHours();
+  
+  if (hour >= 5 && hour < 12) {
+    return "Good Morning";
+  } else if (hour >= 12 && hour < 17) {
+    return "Good Afternoon";
+  } else if (hour >= 17 && hour < 21) {
+    return "Good Evening";
+  } else {
+    return "Good Night";
+  }
+};
 
 const EmployeeDashboard = ({ user, setSection }) => {
 
@@ -12,6 +27,7 @@ const EmployeeDashboard = ({ user, setSection }) => {
     pendingLeaves: 0,
     approvedLeaves: 0,
     rejectedLeaves: 0,
+    totalTeamMembers: 0,
   });
 
   const [leaveBalance, setLeaveBalance] = useState(null);
@@ -19,74 +35,179 @@ const EmployeeDashboard = ({ user, setSection }) => {
   const [managerInfo, setManagerInfo] = useState(null);
   const [upcomingHolidays, setUpcomingHolidays] = useState([]);
   const [showHierarchy, setShowHierarchy] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const fetchEmployeeData = async () => {
     try {
-      // Fetch leave balance
-      const balanceRes = await axios.get(
-        `${process.env.REACT_APP_BACKEND_URL}/api/leaves/balance/${user.id}`
-      );
-      setLeaveBalance(balanceRes.data);
+      setLoading(true);
+      setError(null);
+      
+      console.log("🔍 Fetching employee data for user:", user.id);
 
-      // Fetch leave history
-      const historyRes = await axios.get(
-        `${process.env.REACT_APP_BACKEND_URL}/api/leaves/history/${user.id}`
-      );
-      const leaves = historyRes.data;
+      // ✅ FIX 1: Fetch leave balance with error handling
+      try {
+        const balanceRes = await axios.get(
+          `${process.env.REACT_APP_BACKEND_URL}/api/leaves/balance/${user.id}`
+        );
+        setLeaveBalance(balanceRes.data);
+        console.log("✅ Leave balance fetched");
+      } catch (balanceErr) {
+        console.error("❌ Error fetching leave balance:", balanceErr);
+        // Set default balance if fetch fails
+        setLeaveBalance({
+          sick: 0,
+          sickTotal: 6,
+          planned: 0,
+          plannedTotal: 12,
+          optional: 0,
+          optionalTotal: 2,
+          lwp: 0
+        });
+      }
+
+      // ✅ FIX 2: Fetch leave history with error handling
+      let leaves = [];
+      try {
+        const historyRes = await axios.get(
+          `${process.env.REACT_APP_BACKEND_URL}/api/leaves/history/${user.id}`
+        );
+        leaves = Array.isArray(historyRes.data) ? historyRes.data : [];
+        console.log("✅ Leave history fetched:", leaves.length);
+      } catch (historyErr) {
+        console.error("❌ Error fetching leave history:", historyErr);
+        console.error("Error details:", historyErr.response?.data);
+        leaves = [];
+      }
 
       // Calculate stats
       const pending = leaves.filter((l) => l.status === "Pending").length;
       const approved = leaves.filter((l) => l.status === "Approved").length;
       const rejected = leaves.filter((l) => l.status === "Rejected").length;
 
-      setStats({
+      setStats(prev => ({
+        ...prev,
         totalLeaves: leaves.length,
         pendingLeaves: pending,
         approvedLeaves: approved,
         rejectedLeaves: rejected,
-      });
+      }));
 
       // Get recent 5 leaves
       setRecentLeaves(leaves.slice(0, 5));
 
-      // Fetch manager info
+      // ✅ FIX 3: Fetch manager info with comprehensive fallback logic
       try {
-        const managerRes = await axios.get(
-          `${process.env.REACT_APP_BACKEND_URL}/api/users/get_manager/${user.id}`
+        console.log("🔍 Fetching manager info for user:", user.id);
+        
+        const userProfileRes = await axios.get(
+          `${process.env.REACT_APP_BACKEND_URL}/api/users/${user.id}`
         );
-        setManagerInfo(managerRes.data);
+        const userProfile = userProfileRes.data;
+        
+        console.log("📄 User profile:", {
+          id: userProfile._id,
+          name: userProfile.name,
+          reportsToEmail: userProfile.reportsToEmail,
+          reportsTo: userProfile.reportsTo
+        });
+
+        let foundManager = null;
+
+        // Method 1: Try reportsToEmail
+        if (userProfile.reportsToEmail && userProfile.reportsToEmail.trim() !== '') {
+          console.log("✅ Found reportsToEmail:", userProfile.reportsToEmail);
+          
+          const allUsersRes = await axios.get(
+            `${process.env.REACT_APP_BACKEND_URL}/api/users/`
+          );
+          const allUsers = allUsersRes.data;
+          
+          foundManager = allUsers.find(
+            u => u.email.toLowerCase() === userProfile.reportsToEmail.toLowerCase()
+          );
+          
+          if (foundManager) {
+            console.log("✅ Manager found via email:", foundManager.name);
+          }
+        }
+        
+        // Method 2: Fallback to reportsTo ObjectId
+        if (!foundManager && userProfile.reportsTo) {
+          console.log("⚠️ Trying reportsTo ObjectId:", userProfile.reportsTo);
+          
+          try {
+            const managerRes = await axios.get(
+              `${process.env.REACT_APP_BACKEND_URL}/api/users/${userProfile.reportsTo}`
+            );
+            
+            if (managerRes.data) {
+              foundManager = managerRes.data;
+              console.log("✅ Manager found via ObjectId:", foundManager.name);
+            }
+          } catch (managerErr) {
+            console.error("❌ Error fetching manager by ID:", managerErr);
+          }
+        }
+        
+        setManagerInfo(foundManager);
+        
+        if (!foundManager) {
+          console.log("ℹ️ No manager found for this user");
+        }
       } catch (err) {
-        console.log("No manager assigned");
+        console.error("❌ Error fetching manager:", err);
+        setManagerInfo(null);
       }
 
-      // Set upcoming holidays (next 3 from today)
-      // Fetch admin-defined holidays
+      // ✅ FIX 4: Fetch upcoming holidays with error handling
       try {
-        const holidaysRes = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/holidays/`);
-        const allHolidays = holidaysRes.data;
+        const holidaysRes = await axios.get(
+          `${process.env.REACT_APP_BACKEND_URL}/api/holidays/`
+        );
+        const allHolidays = Array.isArray(holidaysRes.data) ? holidaysRes.data : [];
         
-        // Filter upcoming holidays (from today onwards)
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         
         const upcoming = allHolidays
           .filter(h => new Date(h.date) >= today)
           .sort((a, b) => new Date(a.date) - new Date(b.date))
-          .slice(0, 3); // Get next 3 upcoming holidays
+          .slice(0, 3);
         
         setUpcomingHolidays(upcoming);
+        console.log("✅ Holidays fetched:", upcoming.length);
       } catch (err) {
-        console.log("Could not fetch holidays:", err);
+        console.log("⚠️ Could not fetch holidays:", err);
         setUpcomingHolidays([]);
       }
+      
     } catch (err) {
-      console.error("Error loading employee dashboard:", err);
+      console.error("❌ Error loading employee dashboard:", err);
+      setError("Failed to load dashboard data. Please refresh the page.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const checkTeamMembers = async () => {
+    try {
+      const res = await axios.get(
+        `${process.env.REACT_APP_BACKEND_URL}/api/users/get_employees_by_manager/${encodeURIComponent(user.email)}`
+      );
+      const teamCount = Array.isArray(res.data) ? res.data.length : 0;
+      setStats(prev => ({ ...prev, totalTeamMembers: teamCount }));
+      console.log("✅ Team members count:", teamCount);
+    } catch (err) {
+      console.log("ℹ️ No team members or not a manager");
+      setStats(prev => ({ ...prev, totalTeamMembers: 0 }));
     }
   };
 
   useEffect(() => {
     if (user?.id) {
       fetchEmployeeData();
+      checkTeamMembers();
     }
   }, [user]);
 
@@ -132,8 +253,63 @@ const EmployeeDashboard = ({ user, setSection }) => {
   };
 
   const totalBalance = leaveBalance 
-    ? leaveBalance.sick + leaveBalance.planned + (leaveBalance.optional || 0)
+    ? leaveBalance.sick + leaveBalance.planned 
     : 0;
+
+  // ✅ Loading state
+  if (loading) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          minHeight: "100vh",
+          background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+        }}
+      >
+        <div style={{ textAlign: "center", color: "white" }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>⏳</div>
+          <div style={{ fontSize: 18 }}>Loading dashboard...</div>
+        </div>
+      </div>
+    );
+  }
+
+  // ✅ Error state
+  if (error) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          minHeight: "100vh",
+          background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+        }}
+      >
+        <div style={{ textAlign: "center", color: "white" }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
+          <div style={{ fontSize: 18, marginBottom: 16 }}>{error}</div>
+          <button
+            onClick={() => window.location.reload()}
+            style={{
+              background: "white",
+              color: "#667eea",
+              border: "none",
+              padding: "12px 24px",
+              borderRadius: 8,
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            Refresh Page
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -169,18 +345,9 @@ const EmployeeDashboard = ({ user, setSection }) => {
                     textShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
                   }}
                 >
-                  Welcome back, {user?.name?.split(" ")[0] || "Employee"} 👋
+                  {getTimeBasedGreeting()}, {user?.name?.split(" ")[0] || "Employee"} 👋
                 </h1>
-                <p
-                  style={{
-                    margin: 0,
-                    fontSize: 16,
-                    color: "rgba(255, 255, 255, 0.9)",
-                    marginBottom: 4,
-                  }}
-                >
-                  {user?.designation} • {user?.department}
-                </p>
+
                 <p
                   style={{
                     margin: 0,
@@ -258,7 +425,7 @@ const EmployeeDashboard = ({ user, setSection }) => {
         <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 24, marginBottom: 24 }}>
           {/* Left Column */}
           <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-            {/* Leave Balance Cards - UPDATE THIS SECTION */}
+            {/* Leave Balance Cards */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
               {leaveBalance && (
                 <>
@@ -290,8 +457,8 @@ const EmployeeDashboard = ({ user, setSection }) => {
                     <div style={{ fontSize: 14, color: "#6b7280", marginBottom: 4, fontWeight: 500 }}>
                       Sick Leave
                     </div>
-                    <div style={{ fontSize: 40, fontWeight: 700, color: "#ef4444", marginBottom: 8 }}>
-                      {leaveBalance.sick}
+                    <div style={{ fontSize: 35, fontWeight: 700, color: "#ef4444", marginBottom: 8 }}>
+                      {leaveBalance.sick} <span style={{ fontSize: 16 }}>Left</span>
                     </div>
                     <div style={{ 
                       padding: "8px 12px", 
@@ -338,8 +505,8 @@ const EmployeeDashboard = ({ user, setSection }) => {
                     <div style={{ fontSize: 14, color: "#6b7280", marginBottom: 4, fontWeight: 500 }}>
                       Planned Leave
                     </div>
-                    <div style={{ fontSize: 40, fontWeight: 700, color: "#3b82f6", marginBottom: 8 }}>
-                      {leaveBalance.planned}
+                    <div style={{ fontSize: 35, fontWeight: 700, color: "#3b82f6", marginBottom: 8 }}>
+                      {leaveBalance.planned} <span style={{ fontSize: 16 }}>Left</span>
                     </div>
                     <div style={{ 
                       padding: "8px 12px", 
@@ -386,8 +553,8 @@ const EmployeeDashboard = ({ user, setSection }) => {
                     <div style={{ fontSize: 14, color: "#6b7280", marginBottom: 4, fontWeight: 500 }}>
                       Optional Leave
                     </div>
-                    <div style={{ fontSize: 40, fontWeight: 700, color: "#8b5cf6", marginBottom: 8 }}>
-                      {leaveBalance.optional || 0}
+                    <div style={{ fontSize: 35, fontWeight: 700, color: "#8b5cf6", marginBottom: 8 }}>
+                      {leaveBalance.optional || 0} <span style={{ fontSize: 16 }}>Left</span>
                     </div>
                     <div style={{ 
                       padding: "8px 12px", 
@@ -815,8 +982,8 @@ const EmployeeDashboard = ({ user, setSection }) => {
                             style={{
                               padding: "4px 10px",
                               borderRadius: 6,
-                              background: holiday.type === "national" ? "#fee2e2" : "#fef3c7",
-                              color: holiday.type === "national" ? "#991b1b" : "#92400e",
+                              background: holiday.type === "public" ? "#fee2e2" : "#fef3c7",
+                              color: holiday.type === "public" ? "#991b1b" : "#92400e",
                               fontSize: 11,
                               fontWeight: 600,
                               textTransform: "capitalize",
@@ -913,7 +1080,7 @@ const EmployeeDashboard = ({ user, setSection }) => {
           </div>
         </div>
       </div>
-      {/* ADD THE HIERARCHY MODAL HERE - Right before the closing </div> tags */}
+      {/* Organization Hierarchy Modal */}
       {showHierarchy && (
         <OrganizationHierarchy 
           user={user} 

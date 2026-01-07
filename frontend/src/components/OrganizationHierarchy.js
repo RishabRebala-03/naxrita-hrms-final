@@ -6,11 +6,47 @@ const OrganizationHierarchy = ({ user, onClose }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [expandedNodes, setExpandedNodes] = useState(new Set());
+  const [scale, setScale] = useState(1);
+  const [userWithLevel, setUserWithLevel] = useState(user);
+  const CARD_WIDTH = 260;
+  const CHILD_VERTICAL_GAP = 40;
 
   useEffect(() => {
-    if (user?.id) {
-      fetchHierarchy();
-    }
+    const fetchData = async () => {
+      if (user?.id) {
+        // Fetch complete user data with level
+        try {
+          const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/users/${user.id}`);
+          const completeUser = await response.json();
+          setUserWithLevel(completeUser);
+        } catch (err) {
+          console.error('Error fetching user data:', err);
+          setUserWithLevel(user);
+        }
+        
+        fetchHierarchy();
+      }
+    };
+    
+    fetchData();
+  }, [user]);
+
+  useEffect(() => {
+    const fetchUserLevel = async () => {
+      if (user?.id && !user.level) {
+        try {
+          const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/users/${user.id}`);
+          const userData = await response.json();
+          if (userData.level) {
+            // Update the user object with level
+            user.level = userData.level;
+          }
+        } catch (err) {
+          console.error('Error fetching user level:', err);
+        }
+      }
+    };
+    fetchUserLevel();
   }, [user]);
 
   const fetchHierarchy = async () => {
@@ -39,8 +75,6 @@ const OrganizationHierarchy = ({ user, onClose }) => {
     }
   };
 
-  // In OrganizationHierarchy.js, replace the buildHierarchyTree function with this:
-
   const buildHierarchyTree = (users, currentUserId) => {
     // Filter out system admin from the hierarchy (but keep CEO even if they're Admin)
     const filteredUsers = users.filter(u => {
@@ -64,7 +98,7 @@ const OrganizationHierarchy = ({ user, onClose }) => {
       userMapByEmail.set(u.email.toLowerCase(), userNode);
     });
 
-    // Build parent-child relationships - THIS IS KEY
+    // Build parent-child relationships
     filteredUsers.forEach(u => {
       if (u.reportsToEmail && 
           u.reportsToEmail !== '' && 
@@ -84,12 +118,11 @@ const OrganizationHierarchy = ({ user, onClose }) => {
       }
     });
 
-    // Find CEO - look for designation first, then no manager
+    // Find CEO
     let ceo = Array.from(userMapById.values()).find(u => 
       u.designation?.toLowerCase().includes('ceo')
     );
 
-    // If no CEO by designation, find person with no manager or self-reporting
     if (!ceo) {
       const topLevel = Array.from(userMapById.values()).filter(u => {
         const hasNoManager = !u.reportsToEmail || 
@@ -98,11 +131,9 @@ const OrganizationHierarchy = ({ user, onClose }) => {
         return hasNoManager;
       });
       
-      // If only one top-level person, that's the CEO
       if (topLevel.length === 1) {
         ceo = topLevel[0];
       } else if (topLevel.length > 1) {
-        // Multiple top-level: create virtual root
         ceo = {
           name: 'Organization',
           email: 'root',
@@ -115,7 +146,7 @@ const OrganizationHierarchy = ({ user, onClose }) => {
       }
     }
 
-    // Collect orphaned nodes (people whose manager was filtered out or doesn't exist)
+    // Handle orphans
     const findOrphans = () => {
       const allChildrenIds = new Set();
       const collectChildIds = (node) => {
@@ -132,15 +163,12 @@ const OrganizationHierarchy = ({ user, onClose }) => {
         collectChildIds(ceo);
       }
       
-      const orphans = Array.from(userMapById.values()).filter(u => 
+      return Array.from(userMapById.values()).filter(u => 
         !allChildrenIds.has(u._id)
       );
-      
-      return orphans;
     };
 
     const orphans = findOrphans().filter(o => {
-      // Keep only those who truly have no valid manager reference
       return (
         !o.reportsToEmail ||
         o.reportsToEmail.trim() === '' ||
@@ -149,9 +177,8 @@ const OrganizationHierarchy = ({ user, onClose }) => {
       );
     });
     
-    // Only attach *real* orphans (not ones already assigned properly)
     if (orphans.length > 0 && ceo && !ceo.isVirtual) {
-      console.warn(`⚠️ Found ${orphans.length} valid orphaned employees, attaching to CEO`);
+      console.warn(`⚠️ Found ${orphans.length} orphaned employees, attaching to CEO`);
       orphans.forEach(orphan => {
         if (!ceo.children.find(c => c._id === orphan._id)) {
           ceo.children.push(orphan);
@@ -177,13 +204,11 @@ const OrganizationHierarchy = ({ user, onClose }) => {
   const findPathToUser = (node, targetId, pathNodes) => {
     if (!node) return false;
     
-    // Check if this is the target user
     if (String(node._id) === String(targetId) || node.isCurrentUser) {
       pathNodes.add(node._id || node.email);
       return true;
     }
 
-    // Search in children
     if (node.children && node.children.length > 0) {
       for (const child of node.children) {
         if (findPathToUser(child, targetId, pathNodes)) {
@@ -199,18 +224,16 @@ const OrganizationHierarchy = ({ user, onClose }) => {
   const calculateLevel = (node, targetId, currentLevel = 0) => {
     if (!node) return -1;
   
-    // Found the target
     if (String(node._id) === String(targetId) || node.isCurrentUser) {
-       return node.isVirtual ? currentLevel : currentLevel;
+      return node.isVirtual ? currentLevel : currentLevel;
     }
 
-    // Search in children
     if (node.children && node.children.length > 0) {
       for (const child of node.children) {
         const level = calculateLevel(child, targetId, node.isVirtual ? currentLevel : currentLevel + 1);
         if (level !== -1) return level;
       }
-   }
+    }
 
     return -1;
   };
@@ -218,12 +241,10 @@ const OrganizationHierarchy = ({ user, onClose }) => {
   const getEscalationPath = (node, targetId, path = []) => {
     if (!node) return null;
     
-    // Found the target - return the path including this node
     if (String(node._id) === String(targetId) || node.isCurrentUser) {
       return [...path, node].reverse();
     }
 
-    // Search in children
     if (node.children && node.children.length > 0) {
       for (const child of node.children) {
         const result = getEscalationPath(child, targetId, [...path, node]);
@@ -246,6 +267,27 @@ const OrganizationHierarchy = ({ user, onClose }) => {
     });
   };
 
+  const getLevelBadgeStyle = (level) => {
+    if (!level) return { bg: '#f3f4f6', text: '#6b7280' };
+    
+    // Leadership levels (1-5)
+    if (level <= 5) {
+      return { bg: '#fef3c7', text: '#92400e', border: '#fbbf24' };
+    }
+    // Senior levels (6-10)
+    else if (level <= 10) {
+      return { bg: '#dbeafe', text: '#1e40af', border: '#3b82f6' };
+    }
+    // Mid levels (11-13)
+    else if (level <= 13) {
+      return { bg: '#d1fae5', text: '#065f46', border: '#10b981' };
+    }
+    // Junior levels (14+)
+    else {
+      return { bg: '#e0e7ff', text: '#3730a3', border: '#6366f1' };
+    }
+  };
+
   const renderNode = (node, level = 0) => {
     if (!node) return null;
 
@@ -254,20 +296,21 @@ const OrganizationHierarchy = ({ user, onClose }) => {
     const hasChildren = node.children && node.children.length > 0;
     const isCurrentUser = String(node._id) === String(user.id) || node.isCurrentUser;
     const isVirtual = node.isVirtual;
-
+    
+    const levelStyle = getLevelBadgeStyle(node.level);
+    
     return (
       <div key={nodeId} style={{ 
         display: 'flex', 
         flexDirection: 'column', 
         alignItems: 'center',
-        padding: '10px'
+        minHeight: 'fit-content',
       }}>
         {/* Node Card */}
         <div
           style={{
             position: 'relative',
-            minWidth: 220,
-            maxWidth: 260,
+            width: CARD_WIDTH,
             background: isCurrentUser 
               ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
               : isVirtual 
@@ -283,6 +326,7 @@ const OrganizationHierarchy = ({ user, onClose }) => {
             boxShadow: isCurrentUser 
               ? '0 8px 24px rgba(102, 126, 234, 0.4)'
               : '0 4px 12px rgba(0,0,0,0.1)',
+            marginBottom: 0,
           }}
           onClick={() => hasChildren && toggleNode(nodeId)}
           onMouseEnter={(e) => {
@@ -298,6 +342,31 @@ const OrganizationHierarchy = ({ user, onClose }) => {
               : '0 4px 12px rgba(0,0,0,0.1)';
           }}
         >
+          {/* Level Badge - Top Right Corner */}
+          {!isVirtual && node.level && (
+            <div
+              style={{
+                position: 'absolute',
+                top: 8,
+                right: 8,
+                background: isCurrentUser ? 'rgba(255,255,255,0.3)' : levelStyle.bg,
+                color: isCurrentUser ? 'white' : levelStyle.text,
+                border: isCurrentUser ? '1px solid rgba(255,255,255,0.5)' : `1px solid ${levelStyle.border}`,
+                borderRadius: 8,
+                padding: '4px 10px',
+                fontSize: 11,
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+              }}
+            >
+              <span style={{ fontSize: 9 }}>▲</span>
+              <span>L{node.level}</span>
+            </div>
+          )}
+
           {/* Avatar and Info */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
             <div style={{ position: 'relative' }}>
@@ -436,49 +505,57 @@ const OrganizationHierarchy = ({ user, onClose }) => {
               width: 2,
               height: 30,
               background: '#d1d5db',
+              flexShrink: 0,
             }}
           />
         )}
 
         {/* Children Container */}
         {hasChildren && isExpanded && (
-          <div style={{ position: 'relative' }}>
-            {/* Horizontal Line connecting to children */}
+          <div style={{ 
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            width: '100%',
+          }}>
             {node.children.length > 1 && (
               <div
                 style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: '50%',
-                  transform: 'translateX(-50%)',
-                  width: `${(node.children.length - 1) * 280}px`,
+                  position: 'relative',
+                  width: `${(node.children.length - 1) * (CARD_WIDTH + 40)}px`,
                   height: 2,
                   background: '#d1d5db',
+                  marginBottom: CHILD_VERTICAL_GAP,
                 }}
               />
             )}
 
-            {/* Children Grid */}
             <div
               style={{
                 display: 'flex',
                 justifyContent: 'center',
-                gap: 20,
-                flexWrap: 'wrap',
+                alignItems: 'flex-start',
+                gap: 40,
+                flexWrap: 'nowrap',
+                width: 'fit-content',
               }}
             >
-              {node.children.map((child) => (
-                <div key={child._id} style={{ position: 'relative' }}>
-                  {/* Vertical line from horizontal connector to child */}
+              {node.children.map((child, index) => (
+                <div key={child._id} style={{ 
+                  position: 'relative',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                }}>
                   {node.children.length > 1 && (
                     <div
                       style={{
                         position: 'absolute',
-                        top: -30,
+                        top: -CHILD_VERTICAL_GAP,
                         left: '50%',
                         transform: 'translateX(-50%)',
                         width: 2,
-                        height: 30,
+                        height: CHILD_VERTICAL_GAP,
                         background: '#d1d5db',
                       }}
                     />
@@ -493,7 +570,6 @@ const OrganizationHierarchy = ({ user, onClose }) => {
     );
   };
 
-  // Only calculate these after hierarchy is loaded
   const userLevel = hierarchy ? calculateLevel(hierarchy, user.id) : 0;
   const escalationPath = hierarchy ? getEscalationPath(hierarchy, user.id) : [];
 
@@ -601,10 +677,7 @@ const OrganizationHierarchy = ({ user, onClose }) => {
                 >
                   <div style={{ fontSize: 14, opacity: 0.9, marginBottom: 4 }}>Your Level</div>
                   <div style={{ fontSize: 36, fontWeight: 700 }}>
-                    Level {userLevel >= 0 ? userLevel : 'N/A'}
-                  </div>
-                  <div style={{ fontSize: 12, opacity: 0.8, marginTop: 4 }}>
-                    {userLevel === 0 ? 'Top Level' : userLevel > 0 ? `${userLevel} ${userLevel === 1 ? 'level' : 'levels'} from top` : 'Position not found in hierarchy'}
+                    Level {userWithLevel.level || 'N/A'}
                   </div>
                 </div>
 
@@ -617,49 +690,28 @@ const OrganizationHierarchy = ({ user, onClose }) => {
                   }}
                 >
                   <div style={{ fontSize: 14, color: '#6b7280', marginBottom: 4 }}>
-                    Escalation Path
+                    Your People
                   </div>
-                  <div style={{ fontSize: 36, fontWeight: 700, color: '#10b981' }}>
-                    {escalationPath && escalationPath.length > 0 ? escalationPath.length - 1 : 0}
-                  </div>
-                  <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
-                    {escalationPath && escalationPath.length <= 1 ? 'No escalation needed' : 'managers in escalation path'}
-                  </div>
-                </div>
-
-                <div
-                style={{
-                    background: 'white',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: 12,
-                    padding: 20,
-                }}
-                >
-                <div style={{ fontSize: 14, color: '#6b7280', marginBottom: 4 }}>
-                    Direct Reports
-                </div>
-                <div style={{ fontSize: 36, fontWeight: 700, color: '#3b82f6' }}>
+                  <div style={{ fontSize: 36, fontWeight: 700, color: '#3b82f6' }}>
                     {(() => {
-                    const findUserNode = (node) => {
+                      const findUserNode = (node) => {
                         if (!node) return null;
-                        // Check if this is the current user
                         if (node._id === user.id || node.isCurrentUser) return node;
-                        // Search in children
                         if (node.children && node.children.length > 0) {
-                        for (const child of node.children) {
+                          for (const child of node.children) {
                             const found = findUserNode(child);
                             if (found) return found;
-                        }
+                          }
                         }
                         return null;
-                    };
-                    const userNode = hierarchy ? findUserNode(hierarchy) : null;
-                    return userNode?.children?.length || 0;
+                      };
+                      const userNode = hierarchy ? findUserNode(hierarchy) : null;
+                      return userNode?.children?.length || 0;
                     })()}
-                </div>
-                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
+                  </div>
+                  <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
                     people reporting to you
-                </div>
+                  </div>
                 </div>
               </div>
 
@@ -727,6 +779,9 @@ const OrganizationHierarchy = ({ user, onClose }) => {
                             </div>
                             <div style={{ fontSize: 11, color: '#6b7280' }}>
                               {person.designation}
+                              {person.level && (
+                                <span style={{ marginLeft: 6, color: '#9ca3af' }}>• L{person.level}</span>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -735,19 +790,6 @@ const OrganizationHierarchy = ({ user, onClose }) => {
                         )}
                       </React.Fragment>
                     ))}
-                  </div>
-                  <div
-                    style={{
-                      marginTop: 16,
-                      padding: 12,
-                      background: 'white',
-                      borderRadius: 8,
-                      fontSize: 13,
-                      color: '#6b7280',
-                    }}
-                  >
-                    💡 <strong>Tip:</strong> If your immediate manager is unavailable, escalate to the next
-                    person in the chain. Contact details are shown in the hierarchy below.
                   </div>
                 </div>
               )}
@@ -786,12 +828,66 @@ const OrganizationHierarchy = ({ user, onClose }) => {
                   </button>
                 </div>
 
-                <div style={{ overflowX: 'auto' }}>
-                  {hierarchy && renderNode(hierarchy)}
+                {/* ZOOM + SCROLL container */}
+                <div
+                  style={{
+                    width: '100%',
+                    overflow: 'auto',
+                    border: '1px solid #e5e7eb',
+                    padding: 20,
+                  }}
+                >
+                  <div
+                    style={{
+                      zoom: scale,
+                    }}
+                  >
+                    {hierarchy && renderNode(hierarchy)}
+                  </div>
+                </div>
+
+                {/* Zoom Controls */}
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    gap: 10,
+                    marginTop: 15,
+                  }}
+                >
+                  <button
+                    onClick={() => setScale(prev => Math.max(0.5, prev - 0.1))}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: 8,
+                      border: '1px solid #d1d5db',
+                      background: 'white',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ➖ Zoom Out
+                  </button>
+
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>
+                    {Math.round(scale * 100)}%
+                    </div>
+
+                  <button
+                    onClick={() => setScale(prev => Math.min(2, prev + 0.1))}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: 8,
+                      border: '1px solid #d1d5db',
+                      background: 'white',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ➕ Zoom In
+                  </button>
                 </div>
               </div>
 
-              {/* Legend */}
+              {/* Level Legend */}
               <div
                 style={{
                   marginTop: 20,
@@ -822,16 +918,76 @@ const OrganizationHierarchy = ({ user, onClose }) => {
                     style={{
                       width: 20,
                       height: 20,
-                      background: 'white',
+                      background: '#fef3c7',
                       borderRadius: 4,
-                      border: '1px solid #e5e7eb',
+                      border: '1px solid #fbbf24',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 10,
+                      color: '#92400e',
                     }}
-                  />
-                  <span style={{ color: '#6b7280' }}>Other Employees</span>
+                  >
+                    L1
+                  </div>
+                  <span style={{ color: '#6b7280' }}>Leadership (L1-5)</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 16 }}>▼</span>
-                  <span style={{ color: '#6b7280' }}>Click to expand/collapse</span>
+                  <div
+                    style={{
+                      width: 20,
+                      height: 20,
+                      background: '#dbeafe',
+                      borderRadius: 4,
+                      border: '1px solid #3b82f6',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 10,
+                      color: '#1e40af',
+                    }}
+                  >
+                    L8
+                  </div>
+                  <span style={{ color: '#6b7280' }}>Senior (L6-10)</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div
+                    style={{
+                      width: 20,
+                      height: 20,
+                      background: '#d1fae5',
+                      borderRadius: 4,
+                      border: '1px solid #10b981',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 10,
+                      color: '#065f46',
+                    }}
+                  >
+                    L11
+                  </div>
+                  <span style={{ color: '#6b7280' }}>Mid (L11-13)</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div
+                    style={{
+                      width: 20,
+                      height: 20,
+                      background: '#e0e7ff',
+                      borderRadius: 4,
+                      border: '1px solid #6366f1',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 10,
+                      color: '#3730a3',
+                    }}
+                  >
+                    L14
+                  </div>
+                  <span style={{ color: '#6b7280' }}>Junior (L14+)</span>
                 </div>
               </div>
             </>

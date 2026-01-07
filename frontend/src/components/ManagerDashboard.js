@@ -3,6 +3,21 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import OrganizationHierarchy from "./OrganizationHierarchy";
 import LeaveStatusDot from './LeaveStatusDot';
+import BannerImage from "../assets/banner.jpg";
+
+const getTimeBasedGreeting = () => {
+  const hour = new Date().getHours();
+  
+  if (hour >= 5 && hour < 12) {
+    return "Good Morning";
+  } else if (hour >= 12 && hour < 17) {
+    return "Good Afternoon";
+  } else if (hour >= 17 && hour < 21) {
+    return "Good Evening";
+  } else {
+    return "Good Night";
+  }
+};
 
 const ManagerDashboard = ({ user, onNavigateToProfile }) => {
 
@@ -22,33 +37,59 @@ const ManagerDashboard = ({ user, onNavigateToProfile }) => {
   const [loading, setLoading] = useState(true);
   const [showHierarchy, setShowHierarchy] = useState(false);
 
+  // Replace the fetchManagerData function in ManagerDashboard.js (around line 38)
+
   const fetchManagerData = async () => {
     try {
       setLoading(true);
 
+      console.log("🔍 Fetching data for manager:", user.email);
+
       // Fetch team members
+      // NEW CODE (FIXED):
       const teamRes = await axios.get(
         `${process.env.REACT_APP_BACKEND_URL}/api/users/get_employees_by_manager/${encodeURIComponent(user.email)}`
       );
-      const team = teamRes.data;
+
+      // CRITICAL FIX: Ensure we handle empty responses properly
+      let team = [];
+      if (Array.isArray(teamRes.data)) {
+        team = teamRes.data;
+      } else if (teamRes.data && typeof teamRes.data === 'object') {
+        team = [teamRes.data];
+      } else {
+        console.error("❌ Unexpected response format:", teamRes.data);
+      }
+
+      console.log("✅ Team members fetched:", team.length);
+      console.log("📊 Team data:", JSON.stringify(team, null, 2));
+
+      // CRITICAL: Filter out any null/undefined entries
+      team = team.filter(member => member && member._id);
+
       setTeamMembers(team);
 
       // Fetch pending leave requests
       const pendingRes = await axios.get(
         `${process.env.REACT_APP_BACKEND_URL}/api/leaves/pending/${encodeURIComponent(user.email)}`
       );
-      const pending = pendingRes.data;
+      const pending = pendingRes.data || []; // Ensure it's always an array
+      console.log("✅ Pending leaves fetched:", pending.length);
       setPendingLeaves(pending);
 
       // Fetch all leaves to get recent actions
       const allLeavesRes = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/leaves/all`);
-      const allLeaves = allLeavesRes.data;
+      const allLeaves = allLeavesRes.data || []; // Ensure it's always an array
+      console.log("✅ All leaves fetched:", allLeaves.length);
 
       // Filter leaves for team members and get recent approved/rejected
       const teamIds = team.map(member => member._id);
+      console.log("📊 Team IDs:", teamIds);
+      
       const teamLeaves = allLeaves.filter(leave => 
         teamIds.includes(leave.employee_id)
       );
+      console.log("📊 Team leaves:", teamLeaves.length);
 
       const recent = teamLeaves
         .filter(leave => leave.status !== "Pending")
@@ -69,8 +110,16 @@ const ManagerDashboard = ({ user, onNavigateToProfile }) => {
         return startDate <= today && endDate >= today;
       });
 
-      const workingToday = team.length - onLeaveToday.length;
+      const workingToday = Math.max(0, team.length - onLeaveToday.length);
 
+      console.log("📊 Stats calculated:", {
+        totalTeamMembers: team.length,
+        pendingLeaves: pending.length,
+        onLeaveToday: onLeaveToday.length,
+        workingToday: workingToday
+      });
+
+      // ⭐ FIX: Set stats with proper values
       setStats({
         totalTeamMembers: team.length,
         pendingLeaves: pending.length,
@@ -79,8 +128,17 @@ const ManagerDashboard = ({ user, onNavigateToProfile }) => {
       });
 
     } catch (err) {
-      console.error("Error loading manager dashboard:", err);
+      console.error("❌ Error loading manager dashboard:", err);
+      console.error("Error details:", err.response?.data || err.message);
       setMessage("Failed to load dashboard data");
+      
+      // Set empty stats on error
+      setStats({
+        totalTeamMembers: 0,
+        pendingLeaves: 0,
+        onLeaveToday: 0,
+        workingToday: 0,
+      });
     } finally {
       setLoading(false);
     }
@@ -135,7 +193,11 @@ const ManagerDashboard = ({ user, onNavigateToProfile }) => {
 
   const updateStatus = async (leaveId, status, rejectionReason = "") => {
     try {
-      const payload = { status };
+      const payload = { 
+        status,
+        approved_by: user.name || user.email  // ⭐ REQUIRED FIELD
+      };
+      
       if (status === "Rejected" && rejectionReason.trim()) {
         payload.rejection_reason = rejectionReason;
       }
@@ -149,6 +211,10 @@ const ManagerDashboard = ({ user, onNavigateToProfile }) => {
         setMessage(`Leave ${status.toLowerCase()} successfully ✓`);
         setRejectModal({ show: false, leaveId: null, reason: "" });
         fetchManagerData(); // Refresh data
+        
+        // ⭐ Trigger notification refresh
+        window.dispatchEvent(new Event('refreshNotifications'));
+        
         setTimeout(() => setMessage(""), 3000);
       }
     } catch (err) {
@@ -224,7 +290,7 @@ const ManagerDashboard = ({ user, onNavigateToProfile }) => {
                     textShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
                   }}
                 >
-                  Welcome back, {user?.name?.split(" ")[0] || "Manager"} 👋
+                  {getTimeBasedGreeting()}, {user?.name?.split(" ")[0] || "Manager"} 👋
                 </h1>
                 <p
                   style={{
@@ -276,52 +342,17 @@ const ManagerDashboard = ({ user, onNavigateToProfile }) => {
               border: "1px solid #e5e7eb",
               position: "relative",
               height: 280,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              backgroundImage: "linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)",
             }}
           >
-            {/* Placeholder Content */}
-            <div style={{ textAlign: "center", padding: 40 }}>
-              <div
-                style={{
-                  width: 120,
-                  height: 120,
-                  margin: "0 auto 20px",
-                  borderRadius: "50%",
-                  background: "rgba(102, 126, 234, 0.1)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  border: "3px dashed #667eea",
-                }}
-              >
-                <span style={{ fontSize: 48 }}>🎉</span>
-              </div>
-              <h3
-                style={{
-                  margin: 0,
-                  marginBottom: 8,
-                  fontSize: 20,
-                  fontWeight: 700,
-                  color: "#374151",
-                }}
-              >
-                Festival & Announcements Banner
-              </h3>
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: 14,
-                  color: "#6b7280",
-                  maxWidth: 400,
-                  margin: "0 auto",
-                }}
-              >
-                This space is reserved for upcoming festivals, special announcements, and company celebrations
-              </p>
-            </div>
+            <img
+              src={BannerImage}
+              alt="Festival Banner"
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+              }}
+            />
 
             {/* Corner Badge */}
             <div
@@ -338,7 +369,7 @@ const ManagerDashboard = ({ user, onNavigateToProfile }) => {
                 boxShadow: "0 2px 8px rgba(0, 0, 0, 0.15)",
               }}
             >
-              📢 Coming Soon
+              📢 Festival Announcement
             </div>
           </div>
         </div>

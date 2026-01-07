@@ -21,12 +21,43 @@ import AdminHolidays from "./components/AdminHolidays";
 import AdminApplyLeave from "./components/AdminApplyLeave";
 import AdminLogs from "./components/AdminLogs";
 import TeaCoffee from "./components/TeaCoffee";
+import Policy from "./components/Policy";
+import Projects from "./components/Projects";
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [section, setSection] = useState("dashboard");
   const [viewEmployeeId, setViewEmployeeId] = useState(null);
+
+  // ✅ ADD THIS: Session recovery on app load
+  React.useEffect(() => {
+    const savedUser = localStorage.getItem('user');
+    if (savedUser && !currentUser) {
+      try {
+        const parsedUser = JSON.parse(savedUser);
+        console.log('✅ Session recovered:', parsedUser.name);
+        setCurrentUser(parsedUser);
+        setIsAuthenticated(true);
+      } catch (err) {
+        console.error('❌ Failed to recover session:', err);
+        localStorage.removeItem('user');
+      }
+    }
+  }, []);
+
+  // ✅ ADD THIS: Save session whenever user changes
+  React.useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem('user', JSON.stringify(currentUser));
+      console.log('💾 Session updated in localStorage');
+    }
+  }, [currentUser]);
+
+  // ✅ ADD THIS: Debug logger to track user state changes
+  React.useEffect(() => {
+    console.log('🔍 User state changed:', currentUser ? `Logged in as ${currentUser.name}` : 'Logged out');
+  }, [currentUser]);
 
   const handleLoginSuccess = (user) => {
     setCurrentUser(user);
@@ -36,9 +67,14 @@ function App() {
 
   const handleUserUpdate = (updatedUser) => {
     setCurrentUser(updatedUser);
+    // Session will be auto-saved by the useEffect above
   };
 
   const handleLogout = () => {
+    // ✅ CRITICAL: Clear localStorage on logout
+    localStorage.removeItem('user');
+    console.log('👋 User logged out, session cleared');
+    
     setCurrentUser(null);
     setIsAuthenticated(false);
     setSection("dashboard");
@@ -219,6 +255,12 @@ function App() {
 
       case "tea-coffee":
         return <TeaCoffee user={currentUser} />;
+
+      case "policy":
+        return <Policy user={currentUser} />;
+
+      case "projects":
+        return role === "Admin" ? <Projects user={currentUser} /> : <AccessDenied />;
 
       default:
         // Default to dashboard

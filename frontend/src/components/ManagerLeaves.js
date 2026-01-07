@@ -15,11 +15,31 @@ const ManagerLeaves = ({ user }) => {
     start_date: "",
     end_date: "",
     reason: "",
+    logout_time: "",
   });
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState("newest");
+
+  const getMinDate = () => {
+    const today = new Date();
+    
+    if (leave.leave_type === "Planned") {
+      const minDate = new Date(today);
+      minDate.setDate(today.getDate() + 7);
+      return minDate.toISOString().split('T')[0];
+    }
+    
+    // If applying early logout, allow today
+    if (leave.leave_type === "Early Logout") {
+      return today.toISOString().split('T')[0];
+    }
+    
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
+    return tomorrow.toISOString().split('T')[0];
+  };
 
   const fetchPendingLeaves = async () => {
     try {
@@ -76,6 +96,12 @@ const ManagerLeaves = ({ user }) => {
       return;
     }
 
+    if (leave.leave_type === "Early Logout" && !leave.logout_time) {
+      setMessage("⚠️ Logout time is mandatory for early logout");
+      setTimeout(() => setMessage(""), 5000);
+      return;
+    }
+
     try {
       setLoading(true);
       const res = await axios.post(`${process.env.REACT_APP_BACKEND_URL}/api/leaves/apply`, {
@@ -84,11 +110,12 @@ const ManagerLeaves = ({ user }) => {
         start_date: leave.start_date,
         end_date: leave.end_date,
         reason: leave.reason,
+        logout_time: leave.logout_time || "",
       });
 
       if (res.status === 201) {
         setMessage("Leave applied successfully ✓");
-        setLeave({ leave_type: "Casual", start_date: "", end_date: "", reason: "" });
+        setLeave({ leave_type: "Casual", start_date: "", end_date: "", reason: "", logout_time: "" });
         fetchMyLeaveData();
         setTimeout(() => setMessage(""), 3000);
       }
@@ -471,6 +498,15 @@ const ManagerLeaves = ({ user }) => {
                           <div style={{ color: "#6b7280", marginBottom: 4 }}>Applied On</div>
                           <div style={{ fontWeight: 600 }}>{formatDate(leave.applied_on)}</div>
                         </div>
+
+                        {/* ⭐ LOGOUT TIME DISPLAY (for Early Logout leaves) */}
+                        {leave.logout_time && (
+                          <div style={{ gridColumn: "1 / -1" }}>
+                            <div style={{ color: "#6b7280", marginBottom: 4 }}>Logout Time</div>
+                            <div style={{ fontWeight: 600, color: "#dc2626" }}>🕐 {leave.logout_time}</div>
+                          </div>
+                        )}
+      
                         {leave.reason && (
                           <div style={{ gridColumn: "1 / -1" }}>
                             <div style={{ color: "#6b7280", marginBottom: 4 }}>Reason</div>
@@ -621,6 +657,7 @@ const ManagerLeaves = ({ user }) => {
           {/* Apply Leave */}
           <div className="card" style={{ padding: 24, marginBottom: 24, border: "1px solid #e5e7eb" }}>
             <h4 style={{ marginTop: 0, marginBottom: 16 }}>Apply for Leave</h4>
+            
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
               <div>
                 <label style={{ fontSize: 12, color: "#6b7280", display: "block", marginBottom: 4 }}>
@@ -629,14 +666,17 @@ const ManagerLeaves = ({ user }) => {
                 <select
                   className="input"
                   value={leave.leave_type}
-                  onChange={(e) => setLeave({ ...leave, leave_type: e.target.value })}
+                  onChange={(e) => setLeave({ ...leave, leave_type: e.target.value, start_date: "", end_date: "" })}
                 >
                   <option>Casual</option>
                   <option>Sick</option>
+                  <option>Planned</option>
+                  <option>Early Logout</option>
                   <option>Earned</option>
-                  <option>LWP</option>
+                  <option>LOP</option>
                 </select>
               </div>
+              
               <div>
                 <label style={{ fontSize: 12, color: "#6b7280", display: "block", marginBottom: 4 }}>
                   Start Date *
@@ -645,9 +685,11 @@ const ManagerLeaves = ({ user }) => {
                   className="input"
                   type="date"
                   value={leave.start_date}
+                  min={getMinDate()}
                   onChange={(e) => setLeave({ ...leave, start_date: e.target.value })}
                 />
               </div>
+              
               <div>
                 <label style={{ fontSize: 12, color: "#6b7280", display: "block", marginBottom: 4 }}>
                   End Date *
@@ -656,25 +698,62 @@ const ManagerLeaves = ({ user }) => {
                   className="input"
                   type="date"
                   value={leave.end_date}
+                  min={leave.start_date || getMinDate()}
                   onChange={(e) => setLeave({ ...leave, end_date: e.target.value })}
                 />
               </div>
-              <div>
+              
+              {leave.leave_type === "Early Logout" ? (
+                <div>
+                  <label style={{ fontSize: 12, color: "#6b7280", display: "block", marginBottom: 4 }}>
+                    Logout Time * <span style={{ color: "#ef4444" }}>(Required)</span>
+                  </label>
+                  <input
+                    className="input"
+                    type="time"
+                    value={leave.logout_time || ""}
+                    onChange={(e) => setLeave({ ...leave, logout_time: e.target.value })}
+                  />
+                </div>
+              ) : (
+                <div>
+                  <label style={{ fontSize: 12, color: "#6b7280", display: "block", marginBottom: 4 }}>
+                    Reason
+                  </label>
+                  <input
+                    className="input"
+                    placeholder="Reason for leave"
+                    value={leave.reason}
+                    onChange={(e) => setLeave({ ...leave, reason: e.target.value })}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* ⬇️ REASON FIELD FOR EARLY LOGOUT (OUTSIDE THE GRID) */}
+            {leave.leave_type === "Early Logout" && (
+              <div style={{ marginBottom: 12 }}>
                 <label style={{ fontSize: 12, color: "#6b7280", display: "block", marginBottom: 4 }}>
                   Reason
                 </label>
                 <input
                   className="input"
-                  placeholder="Reason for leave"
+                  placeholder="Reason for early logout"
                   value={leave.reason}
                   onChange={(e) => setLeave({ ...leave, reason: e.target.value })}
                 />
               </div>
-            </div>
+            )}
+
             <button
               className="btn"
               onClick={applyLeave}
-              disabled={loading || !leave.start_date || !leave.end_date}
+              disabled={
+                loading || 
+                !leave.start_date || 
+                !leave.end_date || 
+                (leave.leave_type === "Early Logout" && !leave.logout_time)
+              }
               style={{ width: "100%" }}
             >
               {loading ? "Submitting..." : "📝 Apply Leave"}
@@ -890,7 +969,7 @@ const ManagerLeaves = ({ user }) => {
 
                         {/* LWP */}
                         <div style={{ background: "#fffbeb", padding: 10, borderRadius: 6, border: "1px solid #fcd34d" }}>
-                          <div style={{ fontSize: 10, color: "#92400e", marginBottom: 4 }}>📋 LWP</div>
+                          <div style={{ fontSize: 10, color: "#92400e", marginBottom: 4 }}>📋 LOP</div>
                           <div style={{ fontSize: 18, fontWeight: 700, color: "#f59e0b", marginBottom: 2 }}>
                             {member.leaveBalance.lwp || 0}
                           </div>

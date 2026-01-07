@@ -36,7 +36,7 @@ const EmployeeList = ({ user, onNavigateToProfile, isAdmin = false }) => {
       setEmployees(employeeData);
       setStats({
         total: employeeData.length,
-        active: employeeData.filter(emp => emp.role !== "Admin").length,
+        active: employeeData.length,
       });
       setMessage(employeeData.length === 0 && user.role === "Employee" ? "" : "");
     } catch (err) {

@@ -48,7 +48,6 @@ const UserForm = ({ onSaved }) => {
           dateOfJoining:"", dateOfBirth:"" // RESET THIS TOO
         });
         if (onSaved) onSaved();
-        else window.location.reload();
       } else {
         alert("Error: " + (data.error || "Failed to add"));
       }

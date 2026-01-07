@@ -71,3 +71,41 @@ def delete_holiday(hid):
 
     mongo.db.holidays.delete_one({"_id": _id})
     return jsonify({"ok": True}), 200
+
+# ✅ NEW ENDPOINT: Sync all existing public holidays
+@holiday_bp.post("/sync_tea_coffee_blocks")
+def sync_all_public_holidays():
+    """
+    One-time sync to block tea/coffee for all existing public holidays.
+    Useful for initial setup or fixing any inconsistencies.
+    """
+    try:
+        # Get all public holidays
+        public_holidays = list(mongo.db.holidays.find({"type": "public"}))
+        
+        blocked_count = 0
+        for holiday in public_holidays:
+            date = holiday.get("date")
+            name = holiday.get("name")
+            
+            # Check if already blocked
+            existing = mongo.db.tea_coffee_blocked_dates.find_one({"date": date})
+            if not existing:
+                mongo.db.tea_coffee_blocked_dates.insert_one({
+                    "date": date,
+                    "reason": f"Public Holiday: {name}",
+                    "blocked_at": datetime.utcnow(),
+                    "auto_blocked": True
+                })
+                # Cancel existing orders
+                mongo.db.tea_coffee_orders.delete_many({"date": date})
+                blocked_count += 1
+        
+        return jsonify({
+            "message": f"Synced {blocked_count} public holidays to tea/coffee blocked dates",
+            "total_public_holidays": len(public_holidays),
+            "newly_blocked": blocked_count
+        }), 200
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500

@@ -7,7 +7,8 @@ from flask_cors import CORS, cross_origin
 tea_coffee_bp = Blueprint("tea_coffee_bp", __name__)
 CORS(tea_coffee_bp)
 
-CUTOFF_TIME = "10:30"  # 10:30 AM cutoff
+MORNING_CUTOFF_TIME = "10:30"  # 10:30 AM cutoff for morning slot
+EVENING_CUTOFF_TIME = "14:30"  # 2:30 PM cutoff for evening slot
 
 # -------------------------------
 # Get Blocked Dates
@@ -16,7 +17,12 @@ CUTOFF_TIME = "10:30"  # 10:30 AM cutoff
 @cross_origin()
 def get_blocked_dates():
     try:
-        blocked = list(mongo.db.tea_coffee_blocked_dates.find({}, {"_id": 0, "date": 1, "reason": 1}))
+        blocked = list(mongo.db.tea_coffee_blocked_dates.find({}, {
+            "_id": 0, 
+            "date": 1, 
+            "reason": 1, 
+            "auto_blocked": 1  # Include auto_blocked flag
+        }))
         return jsonify(blocked), 200
     except Exception as e:
         print(f"❌ Error fetching blocked dates: {str(e)}")
@@ -40,13 +46,26 @@ def block_date():
         # Check if already blocked
         existing = mongo.db.tea_coffee_blocked_dates.find_one({"date": date})
         if existing:
-            return jsonify({"error": "Date is already blocked"}), 400
+            # If it's auto-blocked, allow admin to override with manual reason
+            if existing.get("auto_blocked", False):
+                mongo.db.tea_coffee_blocked_dates.update_one(
+                    {"date": date},
+                    {"$set": {
+                        "reason": reason,
+                        "auto_blocked": False,  # Now it's a manual block
+                        "blocked_at": datetime.utcnow()
+                    }}
+                )
+                return jsonify({"message": "Auto-blocked date updated with manual reason"}), 200
+            else:
+                return jsonify({"error": "Date is already manually blocked"}), 400
         
-        # Add to blocked dates
+        # Add to blocked dates (manual block)
         mongo.db.tea_coffee_blocked_dates.insert_one({
             "date": date,
             "reason": reason,
-            "blocked_at": datetime.utcnow()
+            "blocked_at": datetime.utcnow(),
+            "auto_blocked": False  # Manual block by admin
         })
         
         # Cancel all existing orders for this date
@@ -75,6 +94,17 @@ def unblock_date():
         if not date:
             return jsonify({"error": "Date is required"}), 400
         
+        blocked = mongo.db.tea_coffee_blocked_dates.find_one({"date": date})
+        if not blocked:
+            return jsonify({"error": "Date was not blocked"}), 404
+        
+        # Check if it's auto-blocked (from public holiday)
+        if blocked.get("auto_blocked", False):
+            return jsonify({
+                "error": "Cannot unblock auto-blocked date. This date is blocked due to a public holiday. Remove the holiday from the calendar to unblock."
+            }), 400
+        
+        # Delete manual block
         result = mongo.db.tea_coffee_blocked_dates.delete_one({"date": date})
         
         if result.deleted_count == 0:
@@ -141,19 +171,40 @@ def place_order():
         if not morning and not evening:
             return jsonify({"error": "Please select at least one item"}), 400
 
+        # Validate beverage choices
+        valid_choices = ["tea", "coffee", "milk", "black coffee"]
+        if morning and morning not in valid_choices:
+            return jsonify({"error": f"Invalid morning choice: {morning}"}), 400
+        if evening and evening not in valid_choices:
+            return jsonify({"error": f"Invalid evening choice: {evening}"}), 400
+
         # Check if date is blocked
         blocked = mongo.db.tea_coffee_blocked_dates.find_one({"date": date})
         if blocked:
             reason = blocked.get("reason", "Unavailable")
-            return jsonify({"error": f"Tea/Coffee unavailable on this date: {reason}"}), 400
+            is_auto = blocked.get("auto_blocked", False)
+            if is_auto:
+                return jsonify({"error": f"Tea/Coffee unavailable - Public Holiday: {reason}"}), 400
+            else:
+                return jsonify({"error": f"Tea/Coffee unavailable on this date: {reason}"}), 400
 
         order_date = datetime.strptime(date, "%Y-%m-%d").date()
         today = datetime.now().date()
         current_time = datetime.now().time()
-        cutoff = datetime.strptime(CUTOFF_TIME, "%H:%M").time()
+        
+        # Parse cutoff times
+        morning_cutoff = datetime.strptime(MORNING_CUTOFF_TIME, "%H:%M").time()
+        evening_cutoff = datetime.strptime(EVENING_CUTOFF_TIME, "%H:%M").time()
 
-        if order_date == today and current_time >= cutoff:
-            return jsonify({"error": f"Cannot place order for today after {CUTOFF_TIME}"}), 400
+        # Check if ordering for today
+        if order_date == today:
+            # Check morning slot cutoff
+            if morning and current_time >= morning_cutoff:
+                return jsonify({"error": f"Cannot place morning order after {MORNING_CUTOFF_TIME}"}), 400
+            
+            # Check evening slot cutoff
+            if evening and current_time >= evening_cutoff:
+                return jsonify({"error": f"Cannot place evening order after {EVENING_CUTOFF_TIME}"}), 400
 
         if order_date < today:
             return jsonify({"error": "Cannot place order for past dates"}), 400
@@ -169,15 +220,15 @@ def place_order():
         if not employee:
             return jsonify({"error": "Employee not found"}), 404
 
-        # Use ObjectId in the query
+        # Check for existing order
         existing = mongo.db.tea_coffee_orders.find_one({
-            "employee_id": employee_id,  # STRING
+            "employee_id": employee_id,
             "date": date
         })
 
-        # Use ObjectId when saving too
+        # Build order data
         order_data = {
-            "employee_id": employee_id,   # STRING
+            "employee_id": employee_id,
             "employee_name": employee.get("name"),
             "employee_email": employee.get("email"),
             "date": date,
@@ -187,6 +238,13 @@ def place_order():
         }
 
         if existing:
+            # If updating an existing order, check cutoff for each slot being modified
+            if order_date == today:
+                if morning != existing.get("morning") and current_time >= morning_cutoff:
+                    return jsonify({"error": f"Cannot modify morning order after {MORNING_CUTOFF_TIME}"}), 400
+                if evening != existing.get("evening") and current_time >= evening_cutoff:
+                    return jsonify({"error": f"Cannot modify evening order after {EVENING_CUTOFF_TIME}"}), 400
+            
             mongo.db.tea_coffee_orders.update_one(
                 {"_id": existing["_id"]},
                 {"$set": order_data}
@@ -206,7 +264,7 @@ def place_order():
 
 
 # ------------------------------------------
-# ADMIN – GET ORDERS IN DATE RANGE
+# ADMIN – GET ORDERS IN DATE RANGE WITH EMPLOYEE DETAILS
 # ------------------------------------------
 @tea_coffee_bp.route("/admin/orders", methods=["GET"])
 @cross_origin()
@@ -233,7 +291,7 @@ def get_admin_orders():
 
 
 # ------------------------------------------
-# CANCEL ORDER
+# CANCEL ORDER WITH SLOT-SPECIFIC CUTOFF
 # ------------------------------------------
 @tea_coffee_bp.route("/cancel_order", methods=["DELETE"])
 @cross_origin()
@@ -246,13 +304,18 @@ def cancel_order():
         if not employee_id or not date:
             return jsonify({"error": "Employee ID and date required"}), 400
 
-        # Cutoff
+        # Check cutoff times
         order_date = datetime.strptime(date, "%Y-%m-%d").date()
         today = datetime.now().date()
-        cutoff = datetime.strptime(CUTOFF_TIME, "%H:%M").time()
+        current_time = datetime.now().time()
+        
+        morning_cutoff = datetime.strptime(MORNING_CUTOFF_TIME, "%H:%M").time()
+        evening_cutoff = datetime.strptime(EVENING_CUTOFF_TIME, "%H:%M").time()
 
-        if order_date == today and datetime.now().time() >= cutoff:
-            return jsonify({"error": f"Cannot cancel after {CUTOFF_TIME}"}), 400
+        # If cancelling today's order, check if both slots are past cutoff
+        if order_date == today:
+            if current_time >= evening_cutoff:
+                return jsonify({"error": f"Cannot cancel order after {EVENING_CUTOFF_TIME}"}), 400
 
         result = mongo.db.tea_coffee_orders.delete_one({
             "employee_id": employee_id,
@@ -279,6 +342,8 @@ def test_connection():
         return jsonify({
             "status": "OK",
             "total_orders": count,
+            "morning_cutoff": MORNING_CUTOFF_TIME,
+            "evening_cutoff": EVENING_CUTOFF_TIME,
             "timestamp": datetime.utcnow().isoformat()
         }), 200
     except Exception as e:
