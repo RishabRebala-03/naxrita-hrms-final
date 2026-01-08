@@ -1,7 +1,3 @@
-# =============================================================================
-# UPDATED app.py - WITH LEAVE ESCALATION SCHEDULER
-# =============================================================================
-
 from flask import Flask, request, jsonify
 from config.db import init_db
 from routes.user_routes import user_bp
@@ -20,10 +16,14 @@ import requests
 
 app = Flask(__name__, static_url_path="/static", static_folder="static")
 
-# SIMPLIFIED CORS CONFIGURATION
+# ✅ UPDATED CORS CONFIGURATION FOR LOCALHOST
 CORS(app, 
      resources={r"/api/*": {
-         "origins": ["http://192.168.1.131:3000","http://me.naxrita.com"],
+         "origins": [
+             "http://localhost:3000",
+             "http://127.0.0.1:3000",
+             "http://me.naxrita.com"
+         ],
          "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
          "allow_headers": ["Content-Type", "Authorization"],
          "supports_credentials": True
@@ -37,7 +37,10 @@ def before_all_requests():
     if request.method == 'OPTIONS':
         print("✅ Handling OPTIONS/preflight request")
         response = jsonify({'status': 'ok'})
-        response.headers['Access-Control-Allow-Origin'] = 'http://192.168.1.131:3000'
+        origin = request.headers.get('Origin')
+        # Allow localhost and 127.0.0.1
+        if origin in ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://me.naxrita.com']:
+            response.headers['Access-Control-Allow-Origin'] = origin
         response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
         response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
         response.headers['Access-Control-Allow-Credentials'] = 'true'
@@ -46,7 +49,10 @@ def before_all_requests():
 @app.after_request
 def after_request(response):
     print(f"📤 Sending response with status {response.status_code}")
-    response.headers['Access-Control-Allow-Origin'] = 'http://192.168.1.131:3000'
+    origin = request.headers.get('Origin')
+    # Allow localhost and 127.0.0.1
+    if origin in ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://me.naxrita.com']:
+        response.headers['Access-Control-Allow-Origin'] = origin
     response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
     response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
     response.headers['Access-Control-Allow-Credentials'] = 'true'
@@ -65,13 +71,12 @@ app.register_blueprint(tea_coffee_bp, url_prefix="/api/tea_coffee")
 app.register_blueprint(notification_bp, url_prefix="/api/notifications")
 app.register_blueprint(project_bp, url_prefix="/api/projects")
 
-
-# ========== ⭐ NEW ESCALATION FUNCTION - ADD HERE ⭐ ==========
+# ✅ UPDATED ESCALATION FUNCTION - USE LOCALHOST
 def check_leave_escalations():
     """Call the escalation check endpoint"""
     try:
         print("\n🔔 Running scheduled escalation check...")
-        response = requests.post('http://192.168.1.131:5000/api/leaves/check_escalations')
+        response = requests.post('http://localhost:5000/api/leaves/check_escalations')
         
         if response.status_code == 200:
             data = response.json()
@@ -86,8 +91,6 @@ def check_leave_escalations():
             
     except Exception as e:
         print(f"❌ Escalation check error: {str(e)}")
-# ========== END OF NEW FUNCTION ==========
-
 
 # =============================================================================
 # INITIALIZE SCHEDULER WITH ALL JOBS
@@ -115,8 +118,7 @@ scheduler.add_job(
     id="yearly_reset"
 )
 
-# 3. ⭐ ESCALATION CHECK - TEST MODE (every 5 minutes)
-# PRODUCTION MODE (9 AM daily)
+# 3. ⭐ ESCALATION CHECK - DAILY AT 9 AM
 scheduler.add_job(
     func=check_leave_escalations, 
     trigger="cron",
@@ -124,9 +126,6 @@ scheduler.add_job(
     minute=0,
     id="daily_escalation"
 )
-
-print("⚠️ ESCALATION CHECK: Running every 5 minutes (TEST MODE)")
-print("   Change to 'hour=9' for production")
 
 # Start the scheduler
 scheduler.start()
@@ -155,9 +154,9 @@ print()
 
 if __name__ == "__main__":
     try:
-        print("🚀 Starting Flask application on http://192.168.1.131:5000")
+        print("🚀 Starting Flask application on http://localhost:5000")
         print("="*80 + "\n")
-        app.run(debug=True, host='0.0.0.0', port=5000)
+        app.run(debug=True, host='127.0.0.1', port=5000)  # ✅ Changed to 127.0.0.1
     except (KeyboardInterrupt, SystemExit):
         scheduler.shutdown()
         print("\n✅ Scheduler shutdown complete")
