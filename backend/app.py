@@ -23,7 +23,7 @@ app = Flask(__name__, static_url_path="/static", static_folder="static")
 # SIMPLIFIED CORS CONFIGURATION
 CORS(app, 
      resources={r"/api/*": {
-         "origins": ["http://192.168.1.131:3000"],
+         "origins": ["http://192.168.1.131:3000","http://me.naxrita.com"],
          "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
          "allow_headers": ["Content-Type", "Authorization"],
          "supports_credentials": True
@@ -157,7 +157,7 @@ if __name__ == "__main__":
     try:
         print("🚀 Starting Flask application on http://192.168.1.131:5000")
         print("="*80 + "\n")
-        app.run(debug=True, host='192.168.1.131', port=5000)
+        app.run(debug=True, host='0.0.0.0', port=5000)
     except (KeyboardInterrupt, SystemExit):
         scheduler.shutdown()
         print("\n✅ Scheduler shutdown complete")
