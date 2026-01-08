@@ -76,3 +76,13 @@ def login():
     except Exception as e:
         print(f"❌ Login error: {str(e)}")
         return jsonify({"error": str(e)}), 500
+
+@auth_bp.route("/test", methods=["GET"])
+def test():
+    try:
+        return jsonify({
+            "message": "Server is running successfully.........."
+        }), 200
+    except Exception as e:
+        print(f"❌ Test error: {str(e)}")
+        return jsonify({"Internal server error...."}), 500
