@@ -1,0 +1,273 @@
+/* ================= RESET ================= */
+html, body, #root {
+  margin: 0;
+  padding: 0;
+}
+
+/* ===================================================== */
+/* 🔥 ROOT FIX — BREAK OUT OF ALL PARENT CONTAINERS */
+/* (same concept as your fixed TestDetails page)          */
+/* ===================================================== */
+.instructions-root {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  background: #f5f6f7;
+  overflow-y: auto;
+  font-family: '72', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* ================= TOP HEADER ================= */
+.test-header {
+  width: 100%;
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 1.25rem 2rem;
+
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  box-sizing: border-box;
+}
+
+.test-header-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.topbar-logo {
+  height: 40px;
+  width: auto;
+  object-fit: contain;
+}
+
+.test-info {
+  color: #1d2d3e;
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.user-meta {
+  font-size: 0.9375rem;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+/* ================= SUB HEADER ================= */
+.instructions-subheader {
+  width: 100%;
+  background: #ffffff;
+  padding: 0.75rem 2rem;
+
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  border-bottom: 1px solid #d9d9d9;
+  box-sizing: border-box;
+}
+
+.instructions-meta {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #1d2d3e;
+}
+
+.text-controls {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.control-icon-btn {
+  padding: 0.25rem 0.6rem;
+  border: 1px solid #d9d9d9;
+  border-radius: 0.25rem;
+  background: #ffffff;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.control-icon-btn:hover {
+  background: #f7f9fb;
+  border-color: #0070f2;
+}
+
+/* ================= CONTENT ================= */
+.instructions-content {
+  max-width: 72rem;
+  margin: 2.5rem auto;
+  padding: 0 1.5rem;
+}
+
+/* ================= CARD ================= */
+.instructions-card {
+  background: #ffffff;
+  border-radius: 0.75rem;
+  padding: 3rem 3.5rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+}
+
+/* ================= TITLES ================= */
+.instructions-main-title {
+  text-align: center;
+  font-size: 1.75rem;
+  font-weight: 600;
+  color: #1d2d3e;
+  margin-bottom: 2rem;
+}
+
+.instructions-section-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #1d2d3e;
+  margin: 2rem 0 1rem;
+}
+
+/* ================= TEXT ================= */
+.instructions-card p,
+.instructions-intro {
+  font-size: 0.95rem;
+  line-height: 1.7;
+  color: #1d2d3e;
+  margin-bottom: 1.25rem;
+}
+
+/* ================= DISCLAIMER ================= */
+.instructions-disclaimer {
+  background: #fff4e5;
+  border-left: 4px solid #f59e0b;
+  padding: 1.25rem 1.5rem;
+  margin: 2rem 0;
+  font-size: 0.9rem;
+  line-height: 1.7;
+  color: #1d2d3e;
+  border-radius: 0.25rem;
+}
+
+/* ================= LIST ================= */
+.instructions-list {
+  margin-left: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.instructions-list li {
+  font-size: 0.95rem;
+  line-height: 1.7;
+  color: #1d2d3e;
+  margin-bottom: 0.6rem;
+}
+
+/* ================= AGREEMENT ================= */
+.agreement-section {
+  margin-top: 2.5rem;
+  padding: 1.5rem;
+  background: #ebf5ff;
+  border: 1px solid #0070f2;
+  border-radius: 0.5rem;
+}
+
+.agreement-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: #1d2d3e;
+}
+
+.agreement-checkbox input[type="checkbox"] {
+  width: 1.25rem;
+  height: 1.25rem;
+  cursor: pointer;
+  margin-top: 0.2rem;
+  accent-color: #0070f2;
+  flex-shrink: 0;
+}
+
+/* ================= FOOTER ================= */
+.instructions-footer {
+  margin-top: 2rem;
+  background: #ffffff;
+  border-top: 1px solid #e5e7eb;
+  padding: 1.25rem 2rem;
+  display: flex;
+  justify-content: flex-end;
+  border-radius: 0.75rem;
+  box-sizing: border-box;
+}
+
+.footer-actions {
+  display: flex;
+  gap: 1rem;
+}
+
+.footer-btn {
+  padding: 0.75rem 2.25rem;
+  border-radius: 0.4rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  font-family: inherit;
+}
+
+.footer-btn.primary {
+  background: #0070f2;
+  color: #ffffff;
+}
+
+.footer-btn.primary:hover:not(:disabled) {
+  background: #0064d9;
+}
+
+.footer-btn.primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.footer-btn.secondary {
+  background: #f3f4f6;
+  color: #1d2d3e;
+}
+
+.footer-btn.secondary:hover {
+  background: #e5e7eb;
+}
+
+/* ================= RESPONSIVE ================= */
+@media (max-width: 768px) {
+  .test-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .instructions-card {
+    padding: 2rem 1.5rem;
+  }
+
+  .instructions-footer {
+    justify-content: center;
+  }
+
+  .footer-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .footer-btn {
+    width: 100%;
+  }
+}

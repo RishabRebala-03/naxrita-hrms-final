@@ -1,0 +1,263 @@
+.test-builder {
+  max-width: 75rem;
+}
+
+.secondary-btn {
+  padding: 0.75rem 1.5rem;
+  background: transparent;
+  color: #0070f2;
+  border: 0.0625rem solid #0070f2;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+  font-weight: 400;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.secondary-btn:hover {
+  background: #ebf5ff;
+}
+
+.section-management {
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 0.0625rem solid #d9d9d9;
+}
+
+.section-management h4 {
+  font-size: 1rem;
+  font-weight: 400;
+  color: #1d2d3e;
+  margin-bottom: 1rem;
+}
+
+.section-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.section-tag {
+  padding: 0.5rem 1rem;
+  background: #ebf5ff;
+  color: #0070f2;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+}
+
+.add-section {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.add-section input {
+  flex: 1;
+  max-width: 20rem;
+  padding: 0.75rem 1rem;
+  border: 0.0625rem solid #d9d9d9;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+  font-family: inherit;
+}
+
+.questions-section {
+  margin-top: 2rem;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.section-header h3 {
+  font-size: 1.5rem;
+  font-weight: 400;
+  color: #1d2d3e;
+}
+
+.question-form {
+  background: #ffffff;
+  border-radius: 0.5rem;
+  padding: 2rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.05);
+  border-left: 0.25rem solid #0070f2;
+  animation: slideDown 0.3s ease;
+}
+
+.options-section {
+  margin-top: 1.5rem;
+}
+
+.options-section > label {
+  display: block;
+  font-size: 0.875rem;
+  color: #1d2d3e;
+  font-weight: 400;
+  margin-bottom: 1rem;
+}
+
+.option-input {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.option-input input[type="text"] {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  border: 0.0625rem solid #d9d9d9;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+  font-family: inherit;
+}
+
+.option-input input[type="radio"],
+.option-input input[type="checkbox"] {
+  width: 1.125rem;
+  height: 1.125rem;
+  cursor: pointer;
+}
+
+.option-label {
+  font-size: 0.875rem;
+  color: #6a6d70;
+  min-width: 4rem;
+}
+
+.section-block {
+  margin-bottom: 3rem;
+}
+
+.section-block h4 {
+  font-size: 1.25rem;
+  font-weight: 400;
+  color: #1d2d3e;
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 0.125rem solid #0070f2;
+}
+
+.questions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.question-card {
+  background: #ffffff;
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  box-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.05);
+  transition: transform 0.2s ease;
+}
+
+.question-card:hover {
+  transform: translateX(0.25rem);
+}
+
+.question-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.question-number {
+  padding: 0.25rem 0.625rem;
+  background: #0070f2;
+  color: #ffffff;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.question-type {
+  padding: 0.25rem 0.625rem;
+  background: #f7f9fb;
+  color: #6a6d70;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+}
+
+.question-marks {
+  padding: 0.25rem 0.625rem;
+  background: #e8f5e9;
+  color: #2e7d32;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+}
+
+.delete-icon {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: #d32f2f;
+  font-size: 1.125rem;
+  cursor: pointer;
+  padding: 0.25rem;
+  transition: transform 0.2s ease;
+}
+
+.delete-icon:hover {
+  transform: scale(1.2);
+}
+
+.question-text {
+  font-size: 0.875rem;
+  color: #1d2d3e;
+  line-height: 1.5;
+  margin-bottom: 1rem;
+}
+
+.options-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.options-list li {
+  padding: 0.625rem 1rem;
+  background: #f7f9fb;
+  border-radius: 0.25rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+  color: #1d2d3e;
+}
+
+.options-list li.correct-option {
+  background: #e8f5e9;
+  color: #2e7d32;
+  font-weight: 500;
+  border-left: 0.1875rem solid #2e7d32;
+}
+
+.primary-btn.large {
+  padding: 1rem 2rem;
+  font-size: 1rem;
+  width: 100%;
+  max-width: 20rem;
+  margin: 2rem auto;
+  display: block;
+}
+
+@media (max-width: 768px) {
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .add-section {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .add-section input {
+    max-width: none;
+  }
+}

@@ -1,0 +1,178 @@
+.user-management {
+  max-width: 75rem;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.page-header h2 {
+  font-size: 1.75rem;
+  font-weight: 400;
+  color: #1d2d3e;
+}
+
+.primary-btn {
+  padding: 0.75rem 1.5rem;
+  background: #0070f2;
+  color: #ffffff;
+  border: none;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+  font-weight: 400;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.primary-btn:hover {
+  background: #0064d9;
+}
+
+.form-card {
+  background: #ffffff;
+  border-radius: 0.5rem;
+  padding: 2rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.05);
+  animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-1rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.form-card h3 {
+  font-size: 1.25rem;
+  font-weight: 400;
+  color: #1d2d3e;
+  margin-bottom: 1.5rem;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-group label {
+  font-size: 0.875rem;
+  color: #1d2d3e;
+  font-weight: 400;
+}
+
+.form-group input,
+.form-group textarea,
+.form-group select {
+  padding: 0.75rem 1rem;
+  border: 0.0625rem solid #d9d9d9;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+
+.form-group input:focus,
+.form-group textarea:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: #0070f2;
+  box-shadow: 0 0 0 0.125rem rgba(0, 112, 242, 0.1);
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.users-table {
+  background: #ffffff;
+  border-radius: 0.5rem;
+  box-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+thead {
+  background: #f7f9fb;
+}
+
+th {
+  padding: 1rem;
+  text-align: left;
+  font-size: 0.875rem;
+  font-weight: 400;
+  color: #6a6d70;
+  border-bottom: 0.0625rem solid #d9d9d9;
+}
+
+td {
+  padding: 1rem;
+  font-size: 0.875rem;
+  color: #1d2d3e;
+  border-bottom: 0.0625rem solid #f0f0f0;
+}
+
+tbody tr:hover {
+  background: #f7f9fb;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: #6a6d70;
+}
+
+.delete-btn {
+  padding: 0.5rem 1rem;
+  background: transparent;
+  color: #d32f2f;
+  border: 0.0625rem solid #d32f2f;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.delete-btn:hover {
+  background: #d32f2f;
+  color: #ffffff;
+}
+
+@media (max-width: 768px) {
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .users-table {
+    overflow-x: auto;
+  }
+
+  table {
+    min-width: 40rem;
+  }
+}

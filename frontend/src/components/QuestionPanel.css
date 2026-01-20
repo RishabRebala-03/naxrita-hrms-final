@@ -1,0 +1,76 @@
+.question-panel {
+  flex: 1;
+}
+
+.note-text {
+  font-size: 0.875rem;
+  color: #6a6d70;
+  font-weight: 500;
+  margin-bottom: 1rem;
+}
+
+.options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.option-item-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.5rem;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  font-family: inherit;
+  background: transparent;
+  border: none;
+}
+
+.option-item-label:hover {
+  background: transparent;
+}
+
+.option-radio,
+.option-checkbox {
+  width: 1rem;
+  height: 1rem;
+  margin-top: 0.125rem;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.option-text {
+  font-size: 0.875rem;
+  color: #1d2d3e;
+  line-height: 1.5;
+  flex: 1;
+  text-align: left;
+}
+
+.question-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.question-number {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #1d2d3e;
+
+  background: transparent !important;
+  padding: 0 !important;
+  border: none !important;
+
+  line-height: 1.6; /* 👈 match question text */
+}
+
+.question-text {
+  font-size: 0.9375rem;
+  color: #1d2d3e;
+  line-height: 1.6;
+  font-weight: 400;
+  margin: 0;
+}
