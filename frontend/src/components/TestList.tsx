@@ -8,7 +8,7 @@ interface Test {
   duration: number;
   questions: number;
   sections: string[];
-  createdAt: string; // backend returns ISO string
+  createdAt: string;
   status: "active" | "draft" | "completed";
 }
 
@@ -18,12 +18,12 @@ interface User {
   userId: string;
 }
 
-
 interface TestListProps {
   onCreateNew: () => void;
+  onEditTest?: (testId: string) => void;
 }
 
-const TestList: React.FC<TestListProps> = ({ onCreateNew }) => {
+const TestList: React.FC<TestListProps> = ({ onCreateNew, onEditTest }) => {
   const [tests, setTests] = useState<Test[]>([]);
   const [selectedTest, setSelectedTest] = useState<Test | null>(null);
   const [loading, setLoading] = useState(false);
@@ -31,13 +31,11 @@ const TestList: React.FC<TestListProps> = ({ onCreateNew }) => {
   const [assigningTest, setAssigningTest] = useState<Test | null>(null);
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
 
-
   const loadTests = async () => {
     setLoading(true);
     try {
       const res = await apiGet<any>("/admin/exams");
 
-      // 🔑 IMPORTANT FIX
       if (Array.isArray(res.tests)) {
         setTests(res.tests);
       } else {
@@ -52,11 +50,6 @@ const TestList: React.FC<TestListProps> = ({ onCreateNew }) => {
       setLoading(false);
     }
   };
-
-
-  useEffect(() => {
-    loadTests();
-  }, []);
 
   const loadUsers = async () => {
     try {
@@ -74,8 +67,6 @@ const TestList: React.FC<TestListProps> = ({ onCreateNew }) => {
     loadUsers();
   }, []);
 
-
-
   const deleteTest = async (id: string) => {
     const ok = window.confirm("Are you sure you want to delete this test?");
     if (!ok) return;
@@ -87,6 +78,14 @@ const TestList: React.FC<TestListProps> = ({ onCreateNew }) => {
     } catch (e) {
       console.error(e);
       alert("Failed to delete test");
+    }
+  };
+
+  const handleEdit = (testId: string) => {
+    if (onEditTest) {
+      onEditTest(testId);
+    } else {
+      alert("Edit functionality will be implemented soon");
     }
   };
 
@@ -104,7 +103,7 @@ const TestList: React.FC<TestListProps> = ({ onCreateNew }) => {
   };
 
   return (
-    <div className="test-list">
+    <div className="test-list" style={{ paddingTop: '2rem' }}>
       <div className="page-header">
         <h2>All Tests</h2>
         <div style={{ display: "flex", gap: "0.75rem" }}>
@@ -156,8 +155,10 @@ const TestList: React.FC<TestListProps> = ({ onCreateNew }) => {
                 View Details
               </button>
 
-              {/* Edit is not wired in your UI yet. Keep button. */}
-              <button className="action-btn edit-btn" disabled>
+              <button 
+                className="action-btn edit-btn"
+                onClick={() => handleEdit(test.id)}
+              >
                 Edit
               </button>
 
@@ -240,6 +241,7 @@ const TestList: React.FC<TestListProps> = ({ onCreateNew }) => {
           </div>
         </div>
       )}
+
       {assigningTest && (
         <div className="modal-overlay" onClick={() => setAssigningTest(null)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>

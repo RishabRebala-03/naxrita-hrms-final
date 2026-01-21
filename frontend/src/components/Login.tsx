@@ -34,15 +34,25 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     }
   };
 
-
   return (
     <div className="login-container">
       <div className="login-card">
-        <div className="login-header">
-          <h1 className="login-title">Exam Portal</h1>
-          <p className="login-subtitle">Select your role to continue</p>
+        {/* Logo Section */}
+        <div className="login-logo-container">
+          <img
+            src="/assets/emax-logo.png"
+            alt="Emax Technologies"
+            className="login-logo"
+          />
         </div>
 
+        {/* Header */}
+        <div className="login-header">
+          <h1 className="login-title">Online Exam Portal</h1>
+          <p className="login-subtitle">Select your role and sign in to continue</p>
+        </div>
+
+        {/* Role Selector */}
         <div className="role-selector">
           <button
             className={`role-btn ${selectedRole === 'answerer' ? 'active' : ''}`}
@@ -62,6 +72,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           </button>
         </div>
 
+        {/* Login Form */}
         <form onSubmit={handleSubmit} className="login-form">
           <div className="form-group">
             <label htmlFor="userId">User ID</label>
@@ -72,6 +83,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
               onChange={(e) => setUserId(e.target.value)}
               placeholder="Enter your user ID"
               required
+              autoComplete="username"
             />
           </div>
 
@@ -84,16 +96,24 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter your password"
               required
+              autoComplete="current-password"
             />
           </div>
 
           <button type="submit" className="submit-btn" disabled={isLoading}>
-            {isLoading ? 'Logging in...' : 'Log In'}
+            {isLoading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
 
+        {/* Security Badge */}
+        <div className="security-badge">
+          <span className="security-icon">🔒</span>
+          <span>Secure authentication</span>
+        </div>
+
+        {/* Footer */}
         <div className="login-footer">
-          <p>Need help? Contact support</p>
+          <p>Need help? <a href="#support">Contact support</a></p>
         </div>
       </div>
     </div>

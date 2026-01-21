@@ -7,7 +7,7 @@ interface User {
   name: string;
   email: string;
   userId: string;
-  createdAt: string; // ✅ string, not Date
+  createdAt: string;
 }
 
 const UserManagement: React.FC = () => {
@@ -20,11 +20,9 @@ const UserManagement: React.FC = () => {
     password: "",
   });
 
-  // ✅ LOAD USERS CORRECTLY
   useEffect(() => {
     apiGet<any>("/admin/users")
       .then((res) => {
-        // backend-safe parsing
         if (Array.isArray(res)) {
           setUsers(res);
         } else if (Array.isArray(res.users)) {
@@ -40,7 +38,6 @@ const UserManagement: React.FC = () => {
       });
   }, []);
 
-  // ✅ CREATE USER
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -53,9 +50,7 @@ const UserManagement: React.FC = () => {
         role: "answerer",
       });
 
-      // backend may return { user: {...} } or user directly
-      const createdUser: User =
-        res.user ?? res;
+      const createdUser: User = res.user ?? res;
 
       setUsers((prev) => [...prev, createdUser]);
       setShowForm(false);
@@ -66,7 +61,6 @@ const UserManagement: React.FC = () => {
     }
   };
 
-  // ✅ DELETE USER
   const handleDelete = async (id: string) => {
     const ok = window.confirm("Are you sure you want to delete this user?");
     if (!ok) return;
@@ -81,7 +75,7 @@ const UserManagement: React.FC = () => {
   };
 
   return (
-    <div className="user-management">
+    <div className="user-management" style={{ paddingTop: '2rem' }}>
       <div className="page-header">
         <h2>User Management</h2>
         <button className="primary-btn" onClick={() => setShowForm(!showForm)}>

@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import UserManagement from './UserManagement';
 import TestBuilder from './TestBuilder';
+import TestEditor from './TestEditor';
 import TestList from './TestList';
 import './AdminDashboard.css';
 import { apiGet } from '../services/api';
 
-type AdminView = 'dashboard' | 'users' | 'create-test' | 'tests';
+type AdminView = 'dashboard' | 'users' | 'create-test' | 'edit-test' | 'tests';
 
 interface AdminDashboardProps {
   adminName: string;
@@ -20,6 +21,7 @@ interface DashboardStats {
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ adminName, onLogout }) => {
   const [currentView, setCurrentView] = useState<AdminView>('dashboard');
+  const [editingTestId, setEditingTestId] = useState<string | null>(null);
   const [stats, setStats] = useState<DashboardStats>({
     totalUsers: 0,
     activeTests: 0,
@@ -48,14 +50,28 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ adminName, onLogout }) 
     }
   };
 
+  const handleEditTest = (testId: string) => {
+    setEditingTestId(testId);
+    setCurrentView('edit-test');
+  };
+
+  const handleBackToTests = () => {
+    setEditingTestId(null);
+    setCurrentView('tests');
+  };
+
   const renderView = () => {
     switch (currentView) {
       case 'users':
         return <UserManagement />;
       case 'create-test':
         return <TestBuilder onBack={() => setCurrentView('tests')} />;
+      case 'edit-test':
+        return editingTestId ? (
+          <TestEditor testId={editingTestId} onBack={handleBackToTests} />
+        ) : null;
       case 'tests':
-        return <TestList onCreateNew={() => setCurrentView('create-test')} />;
+        return <TestList onCreateNew={() => setCurrentView('create-test')} onEditTest={handleEditTest} />;
       default:
         return (
           <>
@@ -129,7 +145,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ adminName, onLogout }) 
             Users
           </button>
           <button
-            className={`nav-item ${currentView === 'tests' ? 'active' : ''}`}
+            className={`nav-item ${currentView === 'tests' || currentView === 'create-test' || currentView === 'edit-test' ? 'active' : ''}`}
             onClick={() => setCurrentView('tests')}
           >
             <span className="nav-icon">📝</span>

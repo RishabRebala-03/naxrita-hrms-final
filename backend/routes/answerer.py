@@ -243,99 +243,122 @@ def save_attempt(attempt_id: str):
     return jsonify({"message": "Saved"})
 
 
-@answerer_bp.post("/attempts/<attempt_id>/submit")
-def submit_attempt(attempt_id: str):
-    """Submit an attempt, compute result, store in results.
-
-    Payload: {"answers": [...], "timeSpentSec": 123}
-    Returns: {"result": {...}}
-    """
+@answerer_bp.route("/attempts/<attempt_id>/submit", methods=["POST"])
+def submit_attempt(attempt_id):
     payload = request.get_json(silent=True) or {}
-    ok, msg = require_fields(payload, ["answers"])
-    if not ok:
-        return jsonify({"error": msg}), 400
+    answers = payload.get("answers", [])
+    time_spent = int(payload.get("timeSpentSec", 0))
 
     db = get_db()
-    try:
-        oid = ObjectId(attempt_id)
-    except Exception:
-        return jsonify({"error": "Invalid attempt id"}), 400
 
-    attempt = db.attempts.find_one({"_id": oid})
+    attempt = db.attempts.find_one({"_id": ObjectId(attempt_id)})
     if not attempt:
         return jsonify({"error": "Attempt not found"}), 404
 
-    if attempt.get("status") == "submitted":
-        # return existing result
-        existing_res = db.results.find_one({"attemptId": oid})
-        if existing_res:
-            existing_res["id"] = str(existing_res["_id"])
-            existing_res["attemptId"] = str(existing_res.get("attemptId"))
-            existing_res["examId"] = str(existing_res.get("examId"))
-            del existing_res["_id"]
-            return jsonify({"result": to_jsonable(existing_res)})
+    exam_id = attempt["examId"]
 
-    exam_oid = attempt.get("examId")
-    userId = attempt.get("userId")
+    questions = list(db.questions.find({"examId": exam_id}))
 
-    qs = list(db.questions.find({"examId": exam_oid}))
-    # convert question docs for scorer
-    q_for_scoring = []
-    for q in qs:
-        q_for_scoring.append({
-            "_id": q.get("_id"),
-            "id": str(q.get("qid") or q.get("_id")),
-            "type": q.get("type"),
-            "question": q.get("question"),
-            "options": q.get("options", []),
-            "correctAnswer": q.get("correctAnswer"),
-            "section": q.get("section"),
-            "marks": int(q.get("marks", 0)),
+    total_marks = 0
+    scored_marks = 0
+    section_wise = {}
+    question_review = []
+
+    # Map questions by BOTH qid and _id
+    qmap = {}
+    for q in questions:
+        if q.get("qid"):
+            qmap[str(q["qid"])] = q
+        qmap[str(q["_id"])] = q
+
+    for ans in answers:
+        qid = str(ans.get("questionId"))
+        user_answer = ans.get("answer")
+
+        q = qmap.get(qid)
+        if not q:
+            continue  # skip invalid mapping
+
+        correct_answer = q.get("correctAnswer")
+        q_marks = int(q.get("marks", 0))
+        section = q.get("section")
+
+        total_marks += q_marks
+        section_wise.setdefault(section, {"total": 0, "scored": 0})
+        section_wise[section]["total"] += q_marks
+
+        is_correct = False
+
+        # Correct evaluation
+        if q["type"] == "mcq":
+            is_correct = user_answer == correct_answer
+
+        elif q["type"] == "multiple":
+            if isinstance(user_answer, list) and isinstance(correct_answer, list):
+                is_correct = sorted(user_answer) == sorted(correct_answer)
+
+        elif q["type"] == "text":
+            if isinstance(user_answer, str) and isinstance(correct_answer, str):
+                is_correct = user_answer.strip().lower() == correct_answer.strip().lower()
+
+        earned = q_marks if is_correct else 0
+        scored_marks += earned
+        section_wise[section]["scored"] += earned
+
+        question_review.append({
+            "questionId": qid,
+            "isCorrect": is_correct,
+            "userAnswer": user_answer,
+            "correctAnswer": correct_answer,
+            "marks": earned,
+            "section": section,
         })
 
-    result_calc = compute_result(q_for_scoring, payload.get("answers") or [], passing_percent=40.0)
+    percentage = (scored_marks / total_marks) * 100 if total_marks else 0
 
-    now = datetime.utcnow()
-
-    db.attempts.update_one(
-        {"_id": oid},
-        {"$set": {
-            "status": "submitted",
-            "answers": payload.get("answers") or [],
-            "submittedAt": now,
-            "updatedAt": now,
-            "timeSpentSec": int(payload.get("timeSpentSec") or attempt.get("timeSpentSec") or 0),
-        }},
-    )
-
-    # upsert result
-    res_doc = {
-        "attemptId": oid,
-        "examId": exam_oid,
-        "userId": userId,
-        "totalMarks": result_calc["totalMarks"],
-        "scoredMarks": result_calc["scoredMarks"],
-        "percentage": result_calc["percentage"],
-        "passed": result_calc["passed"],
-        "passingPercent": result_calc["passingPercent"],
-        "sectionBreakdown": result_calc["sectionBreakdown"],
-        "review": result_calc["review"],
-        "submittedAt": now,
-        "createdAt": now,
+    result_doc = {
+        "attemptId": attempt_id,
+        "examId": exam_id,
+        "userId": attempt["userId"],
+        "totalMarks": total_marks,
+        "scoredMarks": scored_marks,
+        "percentage": percentage,
+        "passed": percentage >= 40,
+        "percentile": 0,
+        "sectionWise": section_wise,
+        "questionReview": question_review,
+        "submittedAt": datetime.utcnow(),
+        "timeSpentSec": time_spent,
     }
 
-    existing = db.results.find_one({"attemptId": oid})
-    if existing:
-        db.results.update_one({"_id": existing["_id"]}, {"$set": res_doc})
-        res_id = existing["_id"]
-    else:
-        res_ins = db.results.insert_one(res_doc)
-        res_id = res_ins.inserted_id
+    # Insert into database (this adds _id field)
+    insert_result = db.results.insert_one(result_doc)
 
-    res_doc_out = {**res_doc, "id": str(res_id), "attemptId": str(oid), "examId": str(exam_oid)}
-    # attemptId/examId already string, remove objectids in payload
-    return jsonify({"result": to_jsonable(res_doc_out)})
+    # Update attempt status
+    db.attempts.update_one(
+        {"_id": ObjectId(attempt_id)},
+        {"$set": {"status": "submitted"}}
+    )
 
+    # ✅ FIX: Convert ALL ObjectId fields to strings for JSON response
+    response_data = {
+        "attemptId": str(result_doc["attemptId"]),
+        "examId": str(result_doc["examId"]),
+        "userId": str(result_doc["userId"]),
+        "totalMarks": result_doc["totalMarks"],
+        "scoredMarks": result_doc["scoredMarks"],
+        "percentage": result_doc["percentage"],
+        "passed": result_doc["passed"],
+        "percentile": result_doc["percentile"],
+        "sectionWise": result_doc["sectionWise"],
+        "questionReview": result_doc["questionReview"],
+        # Don't include submittedAt and timeSpentSec in response if not needed
+        # or convert datetime to string if needed:
+        # "submittedAt": result_doc["submittedAt"].isoformat(),
+        # "timeSpentSec": result_doc["timeSpentSec"],
+    }
+
+    return jsonify(response_data)
 
 @answerer_bp.get("/results/<attempt_id>")
 def get_result(attempt_id: str):
