@@ -24,13 +24,102 @@ import TeaCoffee from "./components/TeaCoffee";
 import Policy from "./components/Policy";
 import Projects from "./components/Projects";
 
+// ✅ CHANGE #1: ADD THIS NEW COMPONENT RIGHT AFTER IMPORTS
+// This injects critical CSS to fix mobile scrolling
+const MobileScrollFix = () => (
+  <style>{`
+    /* Emergency mobile scroll fix - overrides any conflicting styles */
+    @media (max-width: 480px) {
+      html, body, #root {
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
+        height: auto !important;
+        min-height: 100vh;
+      }
+      
+      .app-root {
+        height: auto !important;
+        min-height: 100vh;
+      }
+      
+      .main {
+        height: auto !important;
+        min-height: 100vh;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch;
+      }
+      
+      .content {
+        overflow: visible !important;
+        height: auto !important;
+        padding-bottom: 60px !important;
+      }
+      
+      /* Fix for iOS Safari bottom bar */
+      @supports (-webkit-touch-callout: none) {
+        .content {
+          padding-bottom: 100px !important;
+        }
+      }
+    }
+  `}</style>
+);
+
+// Nuclear option scroll fix - forces scroll on mount
+const ForceScroll = () => {
+  React.useEffect(() => {
+    if (window.innerWidth <= 480) {
+      console.log('🔧 MOBILE DETECTED - Forcing scroll fix...');
+      
+      // Force body to scroll
+      document.documentElement.style.setProperty('overflow-y', 'scroll', 'important');
+      document.documentElement.style.setProperty('height', 'auto', 'important');
+      document.documentElement.style.setProperty('min-height', '100vh', 'important');
+      
+      document.body.style.setProperty('overflow-y', 'scroll', 'important');
+      document.body.style.setProperty('height', 'auto', 'important');
+      document.body.style.setProperty('min-height', '100vh', 'important');
+      
+      const root = document.getElementById('root');
+      if (root) {
+        root.style.setProperty('overflow-y', 'visible', 'important');
+        root.style.setProperty('height', 'auto', 'important');
+        root.style.setProperty('min-height', '100vh', 'important');
+      }
+      
+      const main = document.querySelector('.main');
+      if (main) {
+        main.style.setProperty('overflow-y', 'scroll', 'important');
+        main.style.setProperty('height', 'auto', 'important');
+        main.style.setProperty('min-height', '100vh', 'important');
+        main.style.setProperty('-webkit-overflow-scrolling', 'touch', 'important');
+      }
+      
+      const content = document.querySelector('.content');
+      if (content) {
+        content.style.setProperty('overflow', 'visible', 'important');
+        content.style.setProperty('height', 'auto', 'important');
+        content.style.setProperty('padding-bottom', '100px', 'important');
+      }
+      
+      console.log('✅ Scroll fix applied!');
+      console.log('Body scrollHeight:', document.body.scrollHeight);
+      console.log('Window innerHeight:', window.innerHeight);
+      console.log('Can scroll:', document.body.scrollHeight > window.innerHeight);
+    }
+  }, []);
+  
+  return null;
+};
+
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [section, setSection] = useState("dashboard");
   const [viewEmployeeId, setViewEmployeeId] = useState(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // ✅ ADD THIS: Session recovery on app load
+  // ✅ Session recovery on app load
   React.useEffect(() => {
     const savedUser = localStorage.getItem('user');
     if (savedUser && !currentUser) {
@@ -46,7 +135,7 @@ function App() {
     }
   }, []);
 
-  // ✅ ADD THIS: Save session whenever user changes
+  // ✅ Save session whenever user changes
   React.useEffect(() => {
     if (currentUser) {
       localStorage.setItem('user', JSON.stringify(currentUser));
@@ -54,7 +143,7 @@ function App() {
     }
   }, [currentUser]);
 
-  // ✅ ADD THIS: Debug logger to track user state changes
+  // ✅ Debug logger to track user state changes
   React.useEffect(() => {
     console.log('🔍 User state changed:', currentUser ? `Logged in as ${currentUser.name}` : 'Logged out');
   }, [currentUser]);
@@ -67,11 +156,9 @@ function App() {
 
   const handleUserUpdate = (updatedUser) => {
     setCurrentUser(updatedUser);
-    // Session will be auto-saved by the useEffect above
   };
 
   const handleLogout = () => {
-    // ✅ CRITICAL: Clear localStorage on logout
     localStorage.removeItem('user');
     console.log('👋 User logged out, session cleared');
     
@@ -81,27 +168,23 @@ function App() {
     setViewEmployeeId(null);
   };
 
-  // REPLACE the handleNavigateToProfile function in App.js (around line 24)
   const handleNavigateToProfile = (employeeId) => {
     console.log("🔍 Navigation requested with:", employeeId);
     console.log("   Type:", typeof employeeId);
     
     let targetId = employeeId;
     
-    // Safety check 1: Handle undefined/null
     if (!employeeId) {
       console.error("❌ No employee ID provided");
       alert("Error: No employee ID provided");
       return;
     }
     
-    // Safety check 2: Handle object case
     if (typeof employeeId === "object" && employeeId !== null) {
       console.warn("⚠️ Object passed to navigation, extracting ID...");
       console.log("   Object keys:", Object.keys(employeeId));
       console.log("   Full object:", JSON.stringify(employeeId, null, 2));
       
-      // Try to extract ID from common properties
       targetId = employeeId._id || 
                 employeeId.id || 
                 employeeId.employeeId ||
@@ -116,28 +199,24 @@ function App() {
       }
     }
     
-    // Safety check 3: Ensure it's a string after extraction
     if (typeof targetId !== "string") {
       console.error("❌ targetId is not a string:", targetId, "Type:", typeof targetId);
       alert("Error: Invalid employee ID format (not a string)");
       return;
     }
     
-    // Safety check 4: Check for stringified objects
     if (targetId === "[object Object]" || targetId.includes("[object")) {
       console.error("❌ targetId is a stringified object:", targetId);
       alert("Error: Invalid employee ID (stringified object)");
       return;
     }
     
-    // Safety check 5: Validate MongoDB ObjectId format (24 hex characters)
     if (!/^[a-f0-9]{24}$/i.test(targetId)) {
       console.error("❌ Invalid MongoDB ObjectId format:", targetId);
       alert(`Error: Invalid employee ID format. Expected 24 hex characters, got: ${targetId}`);
       return;
     }
     
-    // All checks passed - navigate
     console.log("✅ All validations passed, navigating to profile:", targetId);
     setViewEmployeeId(targetId);
     setSection("profile");
@@ -164,24 +243,44 @@ function App() {
   const getFilteredSidebar = () => {
     switch (role) {
       case "Admin":
-        return <Sidebar section={section} setSection={handleSectionChange} role="Admin" />;
+        return (
+          <Sidebar
+            section={section}
+            setSection={(s) => {
+              handleSectionChange(s);
+              setIsSidebarOpen(false);
+            }}
+            role="Admin"
+            isOpen={isSidebarOpen}
+          />
+        );
+
       case "Manager":
         return (
           <Sidebar
             section={section}
-            setSection={handleSectionChange}
+            setSection={(s) => {
+              handleSectionChange(s);
+              setIsSidebarOpen(false);
+            }}
             role="Manager"
             restricted={["add", "holidays"]}
+            isOpen={isSidebarOpen}
           />
         );
+
       case "Employee":
       default:
         return (
           <Sidebar
             section={section}
-            setSection={handleSectionChange}
+            setSection={(s) => {
+              handleSectionChange(s);
+              setIsSidebarOpen(false);
+            }}
             role="Employee"
             restricted={["add", "employees", "holidays"]}
+            isOpen={isSidebarOpen}
           />
         );
     }
@@ -196,7 +295,7 @@ function App() {
           return (
             <ManagerDashboard 
               user={currentUser} 
-              onNavigateToProfile={handleNavigateToProfile} // ✅ Safe handler
+              onNavigateToProfile={handleNavigateToProfile}
             />
           );
         } else {
@@ -263,9 +362,7 @@ function App() {
         return role === "Admin" ? <Projects user={currentUser} /> : <AccessDenied />;
 
       default:
-        // Default to dashboard
         if (role === "Admin") {
-          // ⬇️ CHANGE: use AdminDashboard
           return <AdminDashboard user={currentUser} />;
         } else if (role === "Manager") {
           return <ManagerDashboard user={currentUser} onNavigateToProfile={handleNavigateToProfile} />;
@@ -282,18 +379,31 @@ function App() {
     </div>
   );
 
+  // ✅ CHANGE #2: MODIFY THE RETURN STATEMENT
+  // Replace the existing return statement with this:
   return (
-    <div className="app-root">
-      {getFilteredSidebar()}
-      <div className="main">
-        <Topbar
-          user={currentUser}
-          onLogout={handleLogout}
-          onNavigateToProfile={handleNavigateToProfile} // ✅ Use same safe handler
+    <>
+      {/* ✅ ADD THIS LINE - Inject scroll fix styles */}
+      <MobileScrollFix />
+      <ForceScroll /> 
+      <div className="app-root">
+        <div
+          className="sidebar-backdrop"
+          style={{ display: isSidebarOpen ? 'block' : 'none' }}
+          onClick={() => setIsSidebarOpen(false)}
         />
-        <div className="content">{renderSection()}</div>
+        {getFilteredSidebar()}
+        <div className="main">
+          <Topbar
+            user={currentUser}
+            onLogout={handleLogout}
+            onNavigateToProfile={handleNavigateToProfile}
+            onToggleSidebar={() => setIsSidebarOpen(prev => !prev)}
+          />
+          <div className="content">{renderSection()}</div>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 

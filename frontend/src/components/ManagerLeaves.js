@@ -255,7 +255,7 @@ const ManagerLeaves = ({ user }) => {
   const displayLeaves = getFilteredAndSortedLeaves(pendingLeaves);
 
   const totalMyBalance = myBalance
-    ? (myBalance.sick || 0) + (myBalance.planned || 0) + (myBalance.optional || 0)
+    ? (myBalance.sick || 0) + (myBalance.planned || 0)
     : 0;
 
   return (
@@ -671,6 +671,7 @@ const ManagerLeaves = ({ user }) => {
                   <option>Casual</option>
                   <option>Sick</option>
                   <option>Planned</option>
+                  <option>Optional</option>
                   <option>Early Logout</option>
                   <option>Earned</option>
                   <option>LOP</option>

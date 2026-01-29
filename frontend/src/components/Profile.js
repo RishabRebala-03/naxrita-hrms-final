@@ -555,7 +555,10 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
   };
 
   const isOwnProfile = user?.id === employeeId;
-  const canEdit = role === "Admin" || isOwnProfile;
+
+  const canEditProfile = role === "Admin";                 // profile fields
+  const canChangePassword = role === "Admin" || isOwnProfile;
+  const canChangePhoto = role === "Admin" || isOwnProfile;
   const showSearch = role === "Admin" && !viewEmployeeId;
 
   return (
@@ -912,27 +915,29 @@ const Profile = ({ user, role, viewEmployeeId = null, onUserUpdate }) => {
             </div>
           </div>
 
-          {canEdit && (
-            <div style={{ marginTop: 24, display: "flex", gap: 12 }}>
+          <div style={{ marginTop: 24, display: "flex", gap: 12 }}>
+            {canEditProfile && (
               <button className="btn" onClick={handleEdit}>
                 ✏️ Edit Profile
               </button>
-              {(isOwnProfile || role === "Admin") && (
-                <button 
-                  className="btn ghost" 
-                  onClick={() => setShowPasswordModal(true)}
-                  style={{ 
-                    border: "2px solid #667eea",
-                    color: "#667eea"
-                  }}
-                >
-                  🔒 Change Password
-                </button>
-              )}
-            </div>
-          )}
+            )}
+
+            {canChangePassword && (
+              <button 
+                className="btn ghost" 
+                onClick={() => setShowPasswordModal(true)}
+                style={{ 
+                  border: "2px solid #667eea",
+                  color: "#667eea"
+                }}
+              >
+                🔒 Change Password
+              </button>
+            )}
+          </div>
+
           <br></br>
-          {canEdit && (
+          {canChangePhoto && (
           <>
             <button
               className="btn ghost"

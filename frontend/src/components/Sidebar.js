@@ -2,7 +2,7 @@
 import React from "react";
 import logo from "../assets/naxicon.png";
 
-const Sidebar = ({ section, setSection, role, restricted = [] }) => {
+const Sidebar = ({ section, setSection, role, restricted = [], isOpen }) => {
   const buttons = [
     { key: "dashboard", label: "🏠 Dashboard", roles: ["Admin", "Manager", "Employee"] },
     { key: "employees", label: "👥 Employees", roles: ["Admin", "Manager"] },
@@ -22,7 +22,7 @@ const Sidebar = ({ section, setSection, role, restricted = [] }) => {
   );
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar ${isOpen ? "open" : ""}`}>
       <div
         className="brand"
         style={{

@@ -123,15 +123,36 @@ const EmployeeLeaves = ({ user }) => {
     
     if (leave.leave_type === "Planned") {
       const minDate = new Date(today);
-      minDate.setDate(today.getDate() + 7);
+      minDate.setDate(today.getDate() + 8);  // 7 days from today
       return minDate.toISOString().split('T')[0];
     }
     
-    if (leave.leave_type === "Sick" || leave.leave_type === "Early Logout") {
+    if (leave.leave_type === "Sick") {
+      return todayStr;  // Sick leave starts from today
+    }
+    
+    if (leave.leave_type === "Early Logout") {
       return todayStr;
     }
     
     return todayStr;
+  };
+
+  const getMaxDate = () => {
+    // Sick leave → only today & tomorrow
+    if (leave.leave_type === "Sick") {
+      const today = new Date();
+      // Get tomorrow's date
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      // Format as YYYY-MM-DD
+      const year = tomorrow.getFullYear();
+      const month = String(tomorrow.getMonth() + 1).padStart(2, '0');
+      const day = String(tomorrow.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    return undefined; // no max restriction for others
   };
 
   const isDateBlockedForPlanned = (dateStr) => {
@@ -694,10 +715,14 @@ const EmployeeLeaves = ({ user }) => {
                       end_date: "",
                     }));
                   }}
-                  disabled={isIntern}
                 >
                   <option value="Sick">Sick Leave</option>
-                  {!isIntern && (
+                  {isIntern ? (
+                    <>
+                      <option value="LWP">Leave Without Pay</option>
+                      <option value="Early Logout">Early Logout</option>
+                    </>
+                  ) : (
                     <>
                       <option value="Planned">Planned Leave</option>
                       <option value="Optional">Optional Holiday</option>
@@ -716,6 +741,7 @@ const EmployeeLeaves = ({ user }) => {
                   value={leave.start_date}
                   onChange={(e) => handleDateClick(e, "start")}
                   min={getMinDate()}
+                  max={getMaxDate()}  // ← ADD THIS LINE
                 />
               </div>
 
@@ -727,6 +753,7 @@ const EmployeeLeaves = ({ user }) => {
                   value={leave.end_date}
                   onChange={(e) => handleDateClick(e, "end")}
                   min={leave.start_date || getMinDate()}
+                  max={leave.leave_type === "Sick" ? getMaxDate() : undefined}  // ← ADD THIS LINE
                   disabled={leave.is_half_day}
                 />
               </div>
@@ -769,44 +796,31 @@ const EmployeeLeaves = ({ user }) => {
               </div>
             )}
 
-            {/* Sick Leave Documentation Warning */}
-            {leave.leave_type === "Sick" && leave.start_date && leave.end_date && (
-              (() => {
-                const start = new Date(leave.start_date);
-                const end = new Date(leave.end_date);
-                const daysDiff = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
-                
-                // Adjust for half-day (0.5 days instead of 1)
-                const totalDays = leave.is_half_day ? 0.5 : daysDiff;
-                
-                if (totalDays > 2) {
-                  return (
-                    <div style={{ 
-                      marginBottom: 16, 
-                      padding: 12, 
-                      background: "#fee2e2", 
-                      borderRadius: 8, 
-                      border: "1px solid #ef4444",
-                      display: "flex",
-                      gap: 10,
-                      alignItems: "start"
-                    }}>
-                      <span style={{ fontSize: 18 }}>⚠️</span>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 600, fontSize: 14, color: "#991b1b", marginBottom: 4 }}>
-                          Medical Documentation Required
-                        </div>
-                        <div style={{ fontSize: 13, color: "#991b1b" }}>
-                          Sick leave exceeding <strong>2 days</strong> requires medical documentation 
-                          (such as a medical certificate). Please ensure you have the necessary documents 
-                          before applying for this leave.
-                        </div>
-                      </div>
-                    </div>
-                  );
-                }
-                return null;
-              })()
+            {/* Sick Leave Policy Warning - ALWAYS SHOW */}
+            {leave.leave_type === "Sick" && (
+              <div style={{ 
+                marginBottom: 16, 
+                padding: 12, 
+                background: "#e0f2fe", 
+                borderRadius: 8, 
+                border: "1px solid #0ea5e9",
+                display: "flex",
+                gap: 10,
+                alignItems: "start"
+              }}>
+                <span style={{ fontSize: 18 }}>ℹ️</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600, fontSize: 14, color: "#075985", marginBottom: 4 }}>
+                    Sick Leave Policy
+                  </div>
+                  <div style={{ fontSize: 13, color: "#075985", lineHeight: 1.6 }}>
+                    • Sick leave can only be applied for <strong>today or tomorrow</strong><br/>
+                    • Sick leave exceeding <strong>3 days</strong> must be supported with medical documentation 
+                    (such as a medical certificate or doctor's note). Please ensure you submit the necessary 
+                    documents to HR for leave approval.
+                  </div>
+                </div>
+              </div>
             )}
 
             {/* Half-Day Option for Sick Leave */}

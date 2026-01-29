@@ -19,7 +19,6 @@ const Calendar = ({ user }) => {
     "July", "August", "September", "October", "November", "December"
   ];
 
-  // Fetch holidays and birthdays from backend
   useEffect(() => {
     fetchData();
   }, [selectedYear]);
@@ -29,7 +28,6 @@ const Calendar = ({ user }) => {
       setLoading(true);
       setError("");
       
-      // Fetch holidays for the selected year
       const startDate = `${selectedYear}-01-01`;
       const endDate = `${selectedYear}-12-31`;
       
@@ -38,23 +36,19 @@ const Calendar = ({ user }) => {
       );
       setHolidays(holidaysRes.data);
 
-      // ✅ NEW: Fetch birthdays based on role and direct reports
       if (isAdmin) {
-        // Admin sees all birthdays
         console.log("🔍 Admin: Fetching all birthdays");
         const usersRes = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/users/`);
         const users = usersRes.data;
         const birthdayList = processBirthdays(users);
         setBirthdays(birthdayList);
       } else if (isManager) {
-        // Manager sees their team's birthdays
         console.log("🔍 Manager: Fetching team birthdays");
         const teamRes = await axios.get(
           `${process.env.REACT_APP_BACKEND_URL}/api/users/get_employees_by_manager/${encodeURIComponent(user.email)}`
         );
         const teamMembers = teamRes.data;
         
-        // Add manager's own birthday to the list
         const currentUserRes = await axios.get(
           `${process.env.REACT_APP_BACKEND_URL}/api/users/${user.id}`
         );
@@ -68,7 +62,6 @@ const Calendar = ({ user }) => {
           setHasDirectReports(true);
         }
       } else {
-        // ✅ EMPLOYEE: Check if they have direct reports
         console.log("🔍 Employee: Checking for direct reports");
         try {
           const teamRes = await axios.get(
@@ -76,21 +69,18 @@ const Calendar = ({ user }) => {
           );
           const teamMembers = Array.isArray(teamRes.data) ? teamRes.data : [];
           
-          // Get current user's birthday
           const currentUserRes = await axios.get(
             `${process.env.REACT_APP_BACKEND_URL}/api/users/${user.id}`
           );
           const currentUserData = currentUserRes.data;
           
           if (teamMembers.length > 0) {
-            // Employee with direct reports: show their own birthday + team birthdays
             console.log(`✅ Employee has ${teamMembers.length} direct reports`);
             setHasDirectReports(true);
             const allPeople = [...teamMembers, currentUserData];
             const birthdayList = processBirthdays(allPeople);
             setBirthdays(birthdayList);
           } else {
-            // Regular employee: show only their own birthday
             console.log("✅ Regular employee: showing only own birthday");
             setHasDirectReports(false);
             const birthdayList = processBirthdays([currentUserData]);
@@ -98,7 +88,6 @@ const Calendar = ({ user }) => {
           }
         } catch (err) {
           console.log("⚠️ Error checking direct reports, showing only own birthday");
-          // If error, just show own birthday
           try {
             const currentUserRes = await axios.get(
               `${process.env.REACT_APP_BACKEND_URL}/api/users/${user.id}`
@@ -119,7 +108,6 @@ const Calendar = ({ user }) => {
     }
   };
 
-  // Helper function to process birthdays
   const processBirthdays = (users) => {
     return users
       .filter(user => user && user.dateOfBirth)
@@ -176,18 +164,15 @@ const Calendar = ({ user }) => {
     const firstDay = getFirstDayOfMonth(selectedYear, monthIndex);
     const days = [];
 
-    // Empty cells for days before month starts
     for (let i = 0; i < firstDay; i++) {
       days.push(<div key={`empty-${i}`} className="calendar-day empty"></div>);
     }
 
-    // Days of the month
     for (let day = 1; day <= daysInMonth; day++) {
       const holiday = isHoliday(selectedYear, monthIndex, day);
       const birthdayList = isBirthday(selectedYear, monthIndex, day);
       const today = isToday(selectedYear, monthIndex, day);
       
-      // Determine background color based on holiday type
       let bgColor = "white";
       let borderColor = "#e5e7eb";
       let textColor = "#374151";
@@ -216,7 +201,6 @@ const Calendar = ({ user }) => {
         borderColor = "#fbcfe8";
       }
       
-      // Create title text for tooltip
       let titleText = "";
       if (holiday) titleText += `Holiday: ${holiday.name}`;
       if (birthdayList && birthdayList.length > 0) {
@@ -240,7 +224,6 @@ const Calendar = ({ user }) => {
           title={titleText}
         >
           {day}
-          {/* Holiday indicator */}
           {holiday && (
             <div style={{
               position: "absolute",
@@ -254,7 +237,6 @@ const Calendar = ({ user }) => {
                          holiday.type === "optional" ? "#d97706" : "#0284c7"
             }}></div>
           )}
-          {/* Birthday indicator */}
           {birthdayList && birthdayList.length > 0 && (
             <div style={{
               position: "absolute",
@@ -289,7 +271,6 @@ const Calendar = ({ user }) => {
   const publicHolidays = holidays.filter(h => h.type === "public");
   const optionalHolidays = holidays.filter(h => h.type === "optional");
 
-  // ✅ NEW: Determine birthday visibility message
   const getBirthdayVisibilityMessage = () => {
     if (isAdmin) {
       return "All employee birthdays";
@@ -313,49 +294,66 @@ const Calendar = ({ user }) => {
 
   return (
     <div className="panel">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-        <div>
-          <h3 style={{ margin: 0 }}>Company Calendar {selectedYear}</h3>
-          <p className="muted" style={{ margin: "4px 0 0 0" }}>
-            Organization Holidays & Birthdays
-          </p>
-        </div>
-        
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <button 
-            className="btn ghost" 
-            onClick={() => setSelectedYear(selectedYear - 1)}
-            style={{ padding: "6px 12px" }}
-          >
-            ← {selectedYear - 1}
-          </button>
-          <select 
-            className="input" 
-            value={selectedYear}
-            onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-            style={{ width: 120, padding: "6px 12px" }}
-          >
-            <option value={2024}>2024</option>
-            <option value={2025}>2025</option>
-            <option value={2026}>2026</option>
-            <option value={2027}>2027</option>
-            <option value={2028}>2028</option>
-          </select>
-          <button 
-            className="btn ghost" 
-            onClick={() => setSelectedYear(selectedYear + 1)}
-            style={{ padding: "6px 12px" }}
-          >
-            {selectedYear + 1} →
-          </button>
-          <button
-            className="btn"
-            onClick={fetchData}
-            style={{ padding: "6px 12px", marginLeft: 8 }}
-            title="Refresh calendar"
-          >
-            🔄 Refresh
-          </button>
+      {/* ✅ FIXED: Mobile-responsive header */}
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+          <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+            <h3 style={{ margin: 0, fontSize: window.innerWidth <= 480 ? 16 : 18 }}>Company Calendar {selectedYear}</h3>
+            <p className="muted" style={{ margin: "4px 0 0 0", fontSize: window.innerWidth <= 480 ? 12 : 14 }}>
+              Organization Holidays & Birthdays
+            </p>
+          </div>
+          
+          {/* ✅ FIXED: Responsive year selector */}
+          <div style={{ 
+            display: "flex", 
+            gap: 6, 
+            alignItems: "center",
+            flexWrap: "wrap",
+            justifyContent: window.innerWidth <= 480 ? "flex-start" : "flex-end",
+            width: window.innerWidth <= 480 ? "100%" : "auto"
+          }}>
+            <button 
+              className="btn ghost" 
+              onClick={() => setSelectedYear(selectedYear - 1)}
+              style={{ padding: "6px 10px", fontSize: 12, flex: window.innerWidth <= 480 ? "0 0 auto" : "initial" }}
+            >
+              ← {selectedYear - 1}
+            </button>
+            <select 
+              className="input" 
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+              style={{ width: window.innerWidth <= 480 ? 100 : 120, padding: "6px 10px", fontSize: 12 }}
+            >
+              <option value={2024}>2024</option>
+              <option value={2025}>2025</option>
+              <option value={2026}>2026</option>
+              <option value={2027}>2027</option>
+              <option value={2028}>2028</option>
+            </select>
+            <button 
+              className="btn ghost" 
+              onClick={() => setSelectedYear(selectedYear + 1)}
+              style={{ padding: "6px 10px", fontSize: 12, flex: window.innerWidth <= 480 ? "0 0 auto" : "initial" }}
+            >
+              {selectedYear + 1} →
+            </button>
+            <button
+              className="btn"
+              onClick={fetchData}
+              style={{ 
+                padding: "6px 10px", 
+                fontSize: 12,
+                marginLeft: window.innerWidth <= 480 ? 0 : 8,
+                width: window.innerWidth <= 480 ? "100%" : "auto",
+                marginTop: window.innerWidth <= 480 ? 8 : 0
+              }}
+              title="Refresh calendar"
+            >
+              🔄 {window.innerWidth <= 480 ? "Refresh" : "Refresh"}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -376,30 +374,31 @@ const Calendar = ({ user }) => {
       {/* Legend with Birthday Toggle */}
       <div style={{ 
         display: "flex", 
-        gap: 20, 
+        gap: window.innerWidth <= 480 ? 8 : 20,
         marginBottom: 24, 
         padding: 16, 
         background: "#f9fafb", 
         borderRadius: 8,
         flexWrap: "wrap",
-        alignItems: "center"
+        alignItems: "center",
+        fontSize: window.innerWidth <= 480 ? 11 : 13
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ width: 16, height: 16, background: "#fee2e2", border: "1px solid #fecaca", borderRadius: 4 }}></div>
-          <span style={{ fontSize: 13 }}>Public Holiday ({publicHolidays.length})</span>
+          <div style={{ width: 16, height: 16, background: "#fee2e2", border: "1px solid #fecaca", borderRadius: 4, flexShrink: 0 }}></div>
+          <span>Public Holiday ({publicHolidays.length})</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ width: 16, height: 16, background: "#fef3c7", border: "1px solid #fde68a", borderRadius: 4 }}></div>
-          <span style={{ fontSize: 13 }}>Optional Holiday ({optionalHolidays.length})</span>
+          <div style={{ width: 16, height: 16, background: "#fef3c7", border: "1px solid #fde68a", borderRadius: 4, flexShrink: 0 }}></div>
+          <span>Optional Holiday ({optionalHolidays.length})</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ width: 16, height: 16, background: "#dbeafe", border: "2px solid #3b82f6", borderRadius: 4 }}></div>
-          <span style={{ fontSize: 13 }}>Today</span>
+          <div style={{ width: 16, height: 16, background: "#dbeafe", border: "2px solid #3b82f6", borderRadius: 4, flexShrink: 0 }}></div>
+          <span>Today</span>
         </div>
         
-        {/* ✅ Updated Birthday Toggle - Always show for everyone */}
         <div style={{ 
-          marginLeft: "auto", 
+          marginLeft: window.innerWidth <= 480 ? 0 : "auto",
+          width: window.innerWidth <= 480 ? "100%" : "auto",
           display: "flex", 
           alignItems: "center", 
           gap: 8,
@@ -418,13 +417,12 @@ const Calendar = ({ user }) => {
             onChange={(e) => setShowBirthdays(e.target.checked)}
             style={{ cursor: "pointer" }}
           />
-          <span style={{ fontSize: 13, fontWeight: 600 }}>
+          <span style={{ fontWeight: 600 }}>
             🎂 Show Birthdays ({birthdays.length})
           </span>
         </div>
       </div>
 
-      {/* ✅ Birthday Visibility Info */}
       {showBirthdays && birthdays.length > 0 && (
         <div style={{
           background: "#fffbeb",
@@ -432,7 +430,7 @@ const Calendar = ({ user }) => {
           borderRadius: 8,
           padding: 12,
           marginBottom: 20,
-          fontSize: 13,
+          fontSize: window.innerWidth <= 480 ? 12 : 13,
           color: "#92400e",
           display: "flex",
           alignItems: "center",
@@ -448,7 +446,7 @@ const Calendar = ({ user }) => {
       {/* Calendar Grid */}
       <div style={{ 
         display: "grid", 
-        gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", 
+        gridTemplateColumns: window.innerWidth <= 480 ? "1fr" : "repeat(auto-fit, minmax(280px, 1fr))",
         gap: 20,
         marginBottom: 30
       }}>
@@ -456,8 +454,8 @@ const Calendar = ({ user }) => {
       </div>
 
       {/* Holiday List */}
-      <div className="card" style={{ padding: 20, marginBottom: 20 }}>
-        <h4 style={{ marginTop: 0, marginBottom: 16 }}>
+      <div className="card" style={{ padding: window.innerWidth <= 480 ? 14 : 20, marginBottom: 20 }}>
+        <h4 style={{ marginTop: 0, marginBottom: 16, fontSize: window.innerWidth <= 480 ? 15 : 16 }}>
           Holiday List {selectedYear} ({holidays.length} holidays)
         </h4>
         
@@ -493,26 +491,29 @@ const Calendar = ({ user }) => {
                       display: "flex",
                       justifyContent: "space-between",
                       alignItems: "center",
+                      flexWrap: window.innerWidth <= 480 ? "wrap" : "nowrap",
                       padding: "10px 12px",
                       background: bgColor,
                       borderRadius: 6,
-                      border: `1px solid ${borderColor}`
+                      border: `1px solid ${borderColor}`,
+                      gap: 8
                     }}
                   >
-                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, flex: "1 1 auto", minWidth: 0 }}>
                       <div style={{ 
                         width: 48, 
                         textAlign: "center",
                         fontWeight: 600,
-                        fontSize: 13
+                        fontSize: 13,
+                        flexShrink: 0
                       }}>
                         <div style={{ color: "#6b7280" }}>{dayName}</div>
                         <div>{dateStr}</div>
                       </div>
-                      <div>
-                        <div style={{ fontWeight: 600, fontSize: 14 }}>{holiday.name}</div>
+                      <div style={{ minWidth: 0, flex: "1 1 auto" }}>
+                        <div style={{ fontWeight: 600, fontSize: window.innerWidth <= 480 ? 13 : 14, wordWrap: "break-word" }}>{holiday.name}</div>
                         {holiday.description && (
-                          <div style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>
+                          <div style={{ fontSize: window.innerWidth <= 480 ? 11 : 12, color: "#6b7280", marginTop: 2 }}>
                             {holiday.description}
                           </div>
                         )}
@@ -523,7 +524,7 @@ const Calendar = ({ user }) => {
                         )}
                       </div>
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
                       {holiday.is_optional && (
                         <span style={{
                           fontSize: 11,
@@ -566,8 +567,8 @@ const Calendar = ({ user }) => {
 
       {/* Birthday List */}
       {showBirthdays && birthdays.length > 0 && (
-        <div className="card" style={{ padding: 20 }}>
-          <h4 style={{ marginTop: 0, marginBottom: 16 }}>
+        <div className="card" style={{ padding: window.innerWidth <= 480 ? 14 : 20 }}>
+          <h4 style={{ marginTop: 0, marginBottom: 16, fontSize: window.innerWidth <= 480 ? 15 : 16 }}>
             🎂 Birthdays {selectedYear} ({birthdays.length} birthday{birthdays.length !== 1 ? 's' : ''})
           </h4>
           <div style={{
@@ -597,28 +598,36 @@ const Calendar = ({ user }) => {
                       display: "flex",
                       justifyContent: "space-between",
                       alignItems: "center",
+                      flexWrap: window.innerWidth <= 480 ? "wrap" : "nowrap",
                       padding: "10px 12px",
                       background: birthday.isCurrentUser ? "#fef3c7" : "#fef5f7",
                       borderRadius: 6,
-                      border: birthday.isCurrentUser ? "2px solid #fbbf24" : "1px solid #fbcfe8"
+                      border: birthday.isCurrentUser ? "2px solid #fbbf24" : "1px solid #fbcfe8",
+                      gap: 8
                     }}
                   >
-                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                      <div style={{ fontSize: 24 }}>🎂</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, flex: "1 1 auto", minWidth: 0 }}>
+                      <div style={{ fontSize: 24, flexShrink: 0 }}>🎂</div>
                       <div style={{ 
                         width: 48, 
                         textAlign: "center",
                         fontWeight: 600,
-                        fontSize: 13
+                        fontSize: 13,
+                        flexShrink: 0
                       }}>
                         <div style={{ color: "#6b7280" }}>{dayName}</div>
                         <div>{dateStr}</div>
                       </div>
-                      <div>
-                        <div style={{ fontWeight: 600, fontSize: 14, color: birthday.isCurrentUser ? "#92400e" : "#831843" }}>
+                      <div style={{ minWidth: 0, flex: "1 1 auto" }}>
+                        <div style={{ 
+                          fontWeight: 600, 
+                          fontSize: window.innerWidth <= 480 ? 13 : 14, 
+                          color: birthday.isCurrentUser ? "#92400e" : "#831843",
+                          wordWrap: "break-word"
+                        }}>
                           {birthday.name} {birthday.isCurrentUser && "(You)"}
                         </div>
-                        <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 2 }}>
+                        <div style={{ fontSize: window.innerWidth <= 480 ? 11 : 12, color: "#9ca3af", marginTop: 2 }}>
                           ID: {birthday.employeeId}
                         </div>
                       </div>
@@ -629,7 +638,8 @@ const Calendar = ({ user }) => {
                         background: birthday.isCurrentUser ? "#f59e0b" : "#ec4899",
                         color: "white",
                         fontSize: 11,
-                        padding: "4px 10px"
+                        padding: "4px 10px",
+                        flexShrink: 0
                       }}
                     >
                       {birthday.isCurrentUser ? "Your Birthday" : "Birthday"}

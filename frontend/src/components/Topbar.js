@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import UniversalSearch from "./UniversalSearch";
 import Notifications from "./Notifications";  // ⭐ NEW IMPORT
 
-const Topbar = ({ user, onLogout, onNavigateToProfile }) => {
+const Topbar = ({ user, onLogout, onNavigateToProfile, onToggleSidebar }) => {
   console.log("🔍 Topbar user data:", user);
   const [showDropdown, setShowDropdown] = useState(false);
 
@@ -11,12 +11,23 @@ const Topbar = ({ user, onLogout, onNavigateToProfile }) => {
     <header className="topbar">
       {/* LEFT SIDE - Title + Search */}
       <div style={{ display: "flex", alignItems: "center", gap: 20, flex: 1 }}>
+
+        {/* Mobile Hamburger */}
+        <button
+          className="mobile-menu-btn"
+          onClick={onToggleSidebar}
+        >
+          ☰
+        </button>
+
         <h2 style={{ margin: 0, fontSize: 18, color: "#111827" }}>
           {user?.role === "Admin" ? "Admin Portal" : user?.role === "Manager" ? "Manager Portal" : "Employee Portal"}
         </h2>
         
         {/* Universal Search */}
-        <UniversalSearch currentUser={user} />
+        <div className="desktop-only">
+          <UniversalSearch currentUser={user} />
+        </div>
       </div>
 
       {/* RIGHT SIDE - Notifications + User Dropdown */}

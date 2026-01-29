@@ -613,10 +613,10 @@ def apply_leave():
         # 🔹 NEW: Intern leave type restriction
         employment_type = employee.get("employment_type", "Employee")
         if employment_type == "Intern":
-            # Interns can ONLY apply for Sick leave or LWP
-            if leave_type.lower() not in ["sick", "lwp"]:
+            # Interns can apply for Sick leave, LWP, or Early Logout
+            if leave_type.lower() not in ["sick", "lwp", "early logout"]:
                 return jsonify({
-                    "error": f"Interns can only apply for Sick Leave or Leave Without Pay. {leave_type} is not allowed."
+                    "error": f"Interns can only apply for Sick Leave, Leave Without Pay, or Early Logout. {leave_type} is not allowed."
                 }), 403
             
             print(f"✅ INTERN {employee.get('name')} applying for {leave_type} - validation passed")
@@ -641,41 +641,38 @@ def apply_leave():
         
         today = datetime.now().date()
 
-        # ⭐ SICK LEAVE VALIDATION: Only today and tomorrow
-        if leave_type.lower() == "sick":
-            tomorrow = today + timedelta(days=1)
-            
+        # Date validation based on leave type
+        if leave_type.lower() == "planned":
+            days_difference = (start.date() - today).days
+            if days_difference < 7:  # ← FIXED: Changed from 1 to 7
+                return jsonify({
+                    "error": "Planned leave must be applied at least 7 days in advance."  # ← FIXED: Message updated
+                }), 400
+        
+        elif leave_type.lower() == "sick":
+            # Sick leave: only today and tomorrow allowed
+            max_sick_date = today + timedelta(days=1)
             if start.date() < today:
                 return jsonify({
-                    "error": "Sick leave cannot be applied for past dates."
+                    "error": f"Sick leave cannot be applied for past dates ({start_date})."
                 }), 400
-            
-            if start.date() > tomorrow:
+            if start.date() > max_sick_date:
                 return jsonify({
                     "error": "Sick leave can only be applied for today or tomorrow."
                 }), 400
-            
-            if end.date() > tomorrow:
+            if end.date() > max_sick_date:
                 return jsonify({
                     "error": "Sick leave end date cannot be beyond tomorrow."
                 }), 400
 
-        # Date validation based on leave type
-        if leave_type.lower() == "planned":
-            days_difference = (start.date() - today).days
-            if days_difference < 7:
-                return jsonify({
-                    "error": "Planned leave must be applied at least 7 days in advance."
-                }), 400
-        
         elif leave_type.lower() == "early logout":
             if start.date() < today:
                 return jsonify({
                     "error": f"Early logout cannot be applied for past dates ({start_date})."
                 }), 400
-        
+
         else:
-            if start.date() < today and leave_type.lower() != "sick":
+            if start.date() < today:
                 return jsonify({
                     "error": f"Leave cannot be applied for past dates ({start_date})."
                 }), 400
@@ -888,24 +885,6 @@ def update_leave(leave_id):
 
     today = datetime.now().date()
 
-    # ⭐ SICK LEAVE VALIDATION
-    if data["leave_type"].lower() == "sick":
-        tomorrow = today + timedelta(days=1)
-        
-        if start.date() < today:
-            return jsonify({
-                "error": "Sick leave cannot be applied for past dates."
-            }), 400
-        
-        if start.date() > tomorrow:
-            return jsonify({
-                "error": "Sick leave can only be applied for today or tomorrow."
-            }), 400
-        
-        if end.date() > tomorrow:
-            return jsonify({
-                "error": "Sick leave end date cannot be beyond tomorrow."
-            }), 400
 
     if data["leave_type"].lower() != "early logout":
         if start.date() < today:
