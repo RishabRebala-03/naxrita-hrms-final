@@ -2,12 +2,17 @@ import React, { useEffect, useState } from "react";
 import "./TestList.css";
 import { apiDelete, apiGet, apiPost } from "../services/api";
 
+interface Section {
+  id: string;
+  name: string;
+}
+
 interface Test {
   id: string;
   name: string;
   duration: number;
   questions: number;
-  sections: string[];
+  sections: Section[];
   createdAt: string;
   status: "active" | "draft" | "completed";
 }
@@ -67,6 +72,16 @@ const TestList: React.FC<TestListProps> = ({ onCreateNew, onEditTest }) => {
     loadUsers();
   }, []);
 
+  const handleSelectAll = () => {
+    if (selectedUserIds.length === allUsers.length) {
+      // If all are selected, deselect all
+      setSelectedUserIds([]);
+    } else {
+      // Select all users
+      setSelectedUserIds(allUsers.map(user => user.userId));
+    }
+  };
+
   const deleteTest = async (id: string) => {
     const ok = window.confirm("Are you sure you want to delete this test?");
     if (!ok) return;
@@ -101,6 +116,9 @@ const TestList: React.FC<TestListProps> = ({ onCreateNew, onEditTest }) => {
         return "";
     }
   };
+
+  const allSelected = allUsers.length > 0 && selectedUserIds.length === allUsers.length;
+  const someSelected = selectedUserIds.length > 0 && selectedUserIds.length < allUsers.length;
 
   return (
     <div className="test-list" style={{ paddingTop: '2rem' }}>
@@ -138,7 +156,11 @@ const TestList: React.FC<TestListProps> = ({ onCreateNew, onEditTest }) => {
               </div>
               <div className="test-info">
                 <span className="info-label">Sections:</span>
-                <span className="info-value">{test.sections.join(", ")}</span>
+                <span className="info-value">
+                    {Array.isArray(test.sections) 
+                      ? test.sections.map(s => typeof s === 'string' ? s : s.name).join(", ")
+                      : "N/A"}
+                  </span>
               </div>
               <div className="test-info">
                 <span className="info-label">Created:</span>
@@ -215,9 +237,9 @@ const TestList: React.FC<TestListProps> = ({ onCreateNew, onEditTest }) => {
               <div className="detail-row">
                 <span className="detail-label">Sections:</span>
                 <div className="section-tags">
-                  {selectedTest.sections.map((section) => (
-                    <span key={section} className="section-tag">
-                      {section}
+                  {selectedTest.sections.map((section, index) => (
+                    <span key={typeof section === 'string' ? section : section.id} className="section-tag">
+                      {typeof section === 'string' ? section : section.name}
                     </span>
                   ))}
                 </div>
@@ -259,6 +281,48 @@ const TestList: React.FC<TestListProps> = ({ onCreateNew, onEditTest }) => {
               {allUsers.length === 0 && (
                 <p style={{ color: "#6a6d70" }}>No users available</p>
               )}
+
+              {/* ========== ADD THIS SELECT ALL SECTION HERE ========== */}
+              {allUsers.length > 0 && (
+                <div style={{
+                  marginBottom: "1rem",
+                  paddingBottom: "1rem",
+                  borderBottom: "2px solid #e9ecef"
+                }}>
+                  <label style={{
+                    display: "flex",
+                    alignItems: "center",
+                    fontWeight: 500,
+                    cursor: "pointer"
+                  }}>
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      ref={input => {
+                        if (input) {
+                          input.indeterminate = someSelected;
+                        }
+                      }}
+                      onChange={handleSelectAll}
+                      style={{
+                        width: "1.125rem",
+                        height: "1.125rem",
+                        marginRight: "0.75rem",
+                        cursor: "pointer",
+                        accentColor: "#0070f2"
+                      }}
+                    />
+                    <span style={{
+                      fontWeight: 500,
+                      color: "#0070f2"
+                    }}>
+                      {allSelected ? 'Deselect All' : 'Select All'}
+                      {selectedUserIds.length > 0 && ` (${selectedUserIds.length} selected)`}
+                    </span>
+                  </label>
+                </div>
+              )}
+              {/* ========== END SELECT ALL SECTION ========== */}
 
               {allUsers.map((user) => (
                 <label

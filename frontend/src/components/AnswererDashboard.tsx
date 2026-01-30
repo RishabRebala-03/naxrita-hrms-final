@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import TestInterface from "./TestInterface";
 import "./AnswererDashboard.css";
-import { apiGet } from "../services/api";
+import { apiGet, apiPost } from "../services/api";
 
-type AnswererView = "dashboard" | "tests";
+type AnswererView = "dashboard" | "tests" | "history";
 
 interface Props {
   userName: string; // NOTE: you are passing userId into this currently
@@ -36,8 +36,20 @@ interface ExamForTaking {
   questions: any[];
 }
 
+interface TestHistoryItem {
+  attemptId: string;
+  examId: string;
+  testName: string;
+  submittedAt: string;
+  scoredMarks: number;
+  totalMarks: number;
+  percentage: number;
+  passed: boolean;
+  timeSpentSec: number;
+}
+
 const AnswererDashboard: React.FC<Props> = ({ userName, onLogout }) => {
-  const [activeView, setActiveView] = useState<AnswererView>("dashboard");
+const [activeView, setActiveView] = useState<AnswererView>("dashboard");
 
   const [insights, setInsights] = useState<Insights>({
     testsTaken: 0,
@@ -49,10 +61,18 @@ const AnswererDashboard: React.FC<Props> = ({ userName, onLogout }) => {
 
   const [assignedTests, setAssignedTests] = useState<AssignedTest[]>([]);
   const [loadingTests, setLoadingTests] = useState(false);
+  const [testHistory, setTestHistory] = useState<TestHistoryItem[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   // when user chooses a test, we load it and render TestInterface
   const [activeExam, setActiveExam] = useState<ExamForTaking | null>(null);
   const [loadingExam, setLoadingExam] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [oldPassword, setOldPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
+
 
   const today = useMemo(
     () =>
@@ -93,9 +113,25 @@ const AnswererDashboard: React.FC<Props> = ({ userName, onLogout }) => {
     }
   };
 
+  const loadTestHistory = async () => {
+    setLoadingHistory(true);
+    try {
+      const res = await apiGet<{ history: TestHistoryItem[] }>(
+        `/answerer/history?userId=${encodeURIComponent(userName)}`
+      );
+      setTestHistory(res.history || []);
+    } catch (e) {
+      console.error(e);
+      setTestHistory([]);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
   useEffect(() => {
     loadInsights();
     loadAssignedTests();
+    loadTestHistory();
   }, [userName]);
 
   const startExam = async (examId: string) => {
@@ -120,12 +156,35 @@ const AnswererDashboard: React.FC<Props> = ({ userName, onLogout }) => {
     // refresh insights after a submission
     loadInsights();
     loadAssignedTests();
+    loadTestHistory();
   };
+
+  const formatDate = (dateStr: string) => {
+    try {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString("en-US", {
+        month: "short",
+        day: "2-digit",
+        year: "numeric",
+      });
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}m ${secs}s`;
+  };
+
+  // Store the current view before entering test mode for proper highlighting
+  const showSidebar = activeView !== "tests" || !activeExam;
 
   return (
     <div className="answerer-container">
       {/* Sidebar hidden during exam view */}
-      {activeView !== "tests" && (
+      {showSidebar && (
         <aside className="answerer-sidebar">
           <div className="sidebar-header">
             <img
@@ -145,9 +204,20 @@ const AnswererDashboard: React.FC<Props> = ({ userName, onLogout }) => {
               Dashboard
             </button>
 
-            <button className="nav-item" onClick={() => setActiveView("tests")}>
+            <button 
+              className={`nav-item ${activeView === "tests" ? "active" : ""}`}
+              onClick={() => setActiveView("tests")}
+            >
               <span className="nav-icon">📝</span>
               Tests
+            </button>
+
+            <button 
+              className={`nav-item ${activeView === "history" ? "active" : ""}`}
+              onClick={() => setActiveView("history")}
+            >
+              <span className="nav-icon">📜</span>
+              History
             </button>
           </nav>
 
@@ -159,6 +229,13 @@ const AnswererDashboard: React.FC<Props> = ({ userName, onLogout }) => {
               <div className="user-name">{userName}</div>
             </div>
 
+            <button
+              className="change-password-btn"
+              onClick={() => setShowChangePassword(true)}
+            >
+              Change Password
+            </button>
+
             <button className="logout-btn" onClick={onLogout}>
               Logout
             </button>
@@ -166,26 +243,26 @@ const AnswererDashboard: React.FC<Props> = ({ userName, onLogout }) => {
         </aside>
       )}
 
-      <main className={`answerer-main ${activeView === "tests" ? "no-sidebar" : ""}`}>
+      <main className={`answerer-main ${activeView === "tests" && activeExam ? "no-sidebar" : ""}`}>
         {activeView === "dashboard" && (
           <>
             <div className="dashboard-topbar">
               <div className="dashboard-topbar-left">
-                <span className="dashboard-title">Online Exam Portal</span>
+                <span className="dashboard-title">Dashboard</span>
               </div>
               <div className="dashboard-topbar-right">{today}</div>
             </div>
 
-            <div className="dashboard-home">
+            <div>
               <h2>Welcome back, {userName} 👋</h2>
-              <p className="subtitle">Your learning progress and test insights</p>
+              <p className="subtitle">Track your progress and manage your tests</p>
 
               <div className="stats-grid">
                 <div className="stat-card">
-                  <div className="stat-icon">🧾</div>
+                  <div className="stat-icon">📝</div>
                   <div className="stat-info">
                     <h3>Tests Taken</h3>
-                    <div className="stat-number">{insights.testsTaken}</div>
+                    <p className="stat-number">{insights.testsTaken}</p>
                   </div>
                 </div>
 
@@ -193,15 +270,15 @@ const AnswererDashboard: React.FC<Props> = ({ userName, onLogout }) => {
                   <div className="stat-icon">✅</div>
                   <div className="stat-info">
                     <h3>Tests Passed</h3>
-                    <div className="stat-number">{insights.testsPassed}</div>
+                    <p className="stat-number">{insights.testsPassed}</p>
                   </div>
                 </div>
 
                 <div className="stat-card">
-                  <div className="stat-icon">📈</div>
+                  <div className="stat-icon">📊</div>
                   <div className="stat-info">
                     <h3>Average Score</h3>
-                    <div className="stat-number">{insights.avgScore}%</div>
+                    <p className="stat-number">{insights.avgScore.toFixed(1)}%</p>
                   </div>
                 </div>
 
@@ -209,27 +286,31 @@ const AnswererDashboard: React.FC<Props> = ({ userName, onLogout }) => {
                   <div className="stat-icon">🏆</div>
                   <div className="stat-info">
                     <h3>Best Score</h3>
-                    <div className="stat-number">{insights.bestScore}%</div>
+                    <p className="stat-number">{insights.bestScore.toFixed(1)}%</p>
+                  </div>
+                </div>
+
+                <div className="stat-card">
+                  <div className="stat-icon">🔥</div>
+                  <div className="stat-info">
+                    <h3>Current Streak</h3>
+                    <p className="stat-number">{insights.streak}</p>
                   </div>
                 </div>
               </div>
 
-              <div className="quick-actions">
+              <div className="quick-actions" style={{ marginTop: '2rem' }}>
                 <div className="qa-card enhanced">
                   <div className="qa-left">
-                    <span className="qa-badge">Next Step</span>
-                    <h3>Ready for your next attempt?</h3>
-                    <p>Your assigned assessments will appear below.</p>
-                    <p>Start when ready – progress is tracked automatically.</p>
+                    <span className="qa-badge">Ready to test</span>
+                    <h3>Take Your Next Test</h3>
+                    <p>You have {assignedTests.length} test{assignedTests.length !== 1 ? 's' : ''} assigned. Start your next challenge and improve your skills.</p>
                   </div>
-
                   <div className="qa-right">
-                    <button
-                      className="primary-btn large"
-                      onClick={() => {
-                        const testsPanel = document.querySelector('.lower-grid');
-                        testsPanel?.scrollIntoView({ behavior: 'smooth' });
-                      }}
+                    <button 
+                      className="primary-btn large" 
+                      onClick={() => setActiveView("tests")}
+                      disabled={assignedTests.length === 0}
                     >
                       View Tests
                     </button>
@@ -239,47 +320,107 @@ const AnswererDashboard: React.FC<Props> = ({ userName, onLogout }) => {
 
               <div className="lower-grid">
                 <div className="panel">
-                  <h3 className="panel-title">Assigned Tests</h3>
-
-                  {loadingTests && (
-                    <div style={{ color: "#6a6d70" }}>Loading...</div>
+                  <h3 className="panel-title">Recent Activity</h3>
+                  {testHistory.length === 0 && (
+                    <p style={{ color: "#6a6d70", fontSize: "0.875rem" }}>
+                      No recent activity yet
+                    </p>
                   )}
-
-                  {!loadingTests && assignedTests.length === 0 && (
-                    <div style={{ color: "#6a6d70" }}>
-                      No tests assigned yet.
+                  {testHistory.slice(0, 3).map((item) => (
+                    <div key={item.attemptId} className="activity-row">
+                      <span>{item.testName}</span>
+                      <span className={`activity-score ${item.passed ? '' : 'fail'}`}>
+                        {item.percentage.toFixed(1)}%
+                      </span>
                     </div>
-                  )}
-
-                  {!loadingTests &&
-                    assignedTests.map((t) => (
-                      <div key={t.id} className="test-row">
-                        <div>
-                          <div className="test-name">{t.name}</div>
-                          <div className="test-meta">
-                            {t.questions} Questions • {t.duration} minutes
-                          </div>
-                        </div>
-
-                        <button
-                          className="primary-btn"
-                          style={{ padding: "0.5rem 0.9rem" }}
-                          disabled={loadingExam}
-                          onClick={() => startExam(t.id)}
-                        >
-                          {loadingExam ? "Starting..." : "Start"}
-                        </button>
-                      </div>
-                    ))}
+                  ))}
                 </div>
 
                 <div className="panel">
-                  <h3 className="panel-title">Recent Activity</h3>
-                  <div style={{ color: "#6a6d70", padding: "0.75rem 0" }}>
-                    Your recent test results will appear here
-                  </div>
+                  <h3 className="panel-title">Upcoming Tests</h3>
+                  {assignedTests.length === 0 && (
+                    <p style={{ color: "#6a6d70", fontSize: "0.875rem" }}>
+                      No upcoming tests
+                    </p>
+                  )}
+                  {assignedTests.slice(0, 3).map((test) => (
+                    <div key={test.id} className="test-row">
+                      <div>
+                        <div className="test-name">{test.name}</div>
+                        <div className="test-meta">{test.questions} questions · {test.duration} min</div>
+                      </div>
+                      <span className={`status ${test.status === 'active' ? 'upcoming' : 'locked'}`}>
+                        {test.status}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               </div>
+            </div>
+          </>
+        )}
+
+        {activeView === "history" && (
+          <>
+            <div className="dashboard-topbar">
+              <div className="dashboard-topbar-left">
+                <span className="dashboard-title">Test History</span>
+              </div>
+              <div className="dashboard-topbar-right">{today}</div>
+            </div>
+
+            <div className="history-page">
+              <h2>Your Test History</h2>
+              <p className="subtitle">View all your past test attempts and results</p>
+
+              {loadingHistory && (
+                <div style={{ padding: "2rem", textAlign: "center", color: "#6a6d70" }}>
+                  Loading history...
+                </div>
+              )}
+
+              {!loadingHistory && testHistory.length === 0 && (
+                <div className="empty-state">
+                  <p>No test history yet. Complete your first test to see results here!</p>
+                </div>
+              )}
+
+              {!loadingHistory && testHistory.length > 0 && (
+                <div className="history-list">
+                  {testHistory.map((item) => (
+                    <div key={item.attemptId} className="history-card">
+                      <div className="history-card-header">
+                        <h3>{item.testName}</h3>
+                        <span className={`status-badge ${item.passed ? 'passed' : 'failed'}`}>
+                          {item.passed ? '✓ Passed' : '✗ Failed'}
+                        </span>
+                      </div>
+
+                      <div className="history-card-body">
+                        <div className="history-stat">
+                          <span className="stat-label">Score</span>
+                          <span className="stat-value">{item.scoredMarks} / {item.totalMarks}</span>
+                        </div>
+
+                        <div className="history-stat">
+                          <span className="stat-label">Percentage</span>
+                          <span className="stat-value">{item.percentage.toFixed(2)}%</span>
+                        </div>
+
+                        <div className="history-stat">
+                          <span className="stat-label">Time Taken</span>
+                          <span className="stat-value">{formatDuration(item.timeSpentSec)}</span>
+                        </div>
+
+                        <div className="history-stat">
+                          <span className="stat-label">Date</span>
+                          <span className="stat-value">{formatDate(item.submittedAt)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </>
         )}
@@ -365,6 +506,94 @@ const AnswererDashboard: React.FC<Props> = ({ userName, onLogout }) => {
           </div>
         )}
       </main>
+      {/* ================= CHANGE PASSWORD MODAL ================= */}
+      {showChangePassword && (
+        <div className="modal-overlay">
+          <div className="modal-card">
+            <h3>Change Password</h3>
+
+            <div className="form-group">
+              <label>Current Password</label>
+              <input
+                type="password"
+                value={oldPassword}
+                onChange={(e) => setOldPassword(e.target.value)}
+              />
+            </div>
+
+            <div className="form-group">
+              <label>New Password</label>
+              <input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Confirm New Password</label>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+              />
+            </div>
+
+            <div className="modal-actions">
+              <button
+                className="secondary-btn"
+                onClick={() => {
+                  setShowChangePassword(false);
+                  setOldPassword("");
+                  setNewPassword("");
+                  setConfirmPassword("");
+                }}
+              >
+                Cancel
+              </button>
+
+              <button
+                className="primary-btn"
+                disabled={changingPassword}
+                onClick={async () => {
+                  if (!oldPassword || !newPassword || !confirmPassword) {
+                    alert("All fields are required");
+                    return;
+                  }
+
+                  if (newPassword !== confirmPassword) {
+                    alert("Passwords do not match");
+                    return;
+                  }
+
+                  try {
+                    setChangingPassword(true);
+                    await apiPost("/auth/change-password", {
+                      userId: userName,
+                      role: "answerer",
+                      oldPassword,
+                      newPassword,
+                    });
+
+                    alert("Password changed successfully");
+                    setShowChangePassword(false);
+                    setOldPassword("");
+                    setNewPassword("");
+                    setConfirmPassword("");
+                  } catch (err: any) {
+                    alert(err?.response?.data?.error || "Failed to change password");
+                  } finally {
+                    setChangingPassword(false);
+                  }
+                }}
+              >
+                {changingPassword ? "Updating..." : "Update Password"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ================= END MODAL ================= */}
     </div>
   );
 };

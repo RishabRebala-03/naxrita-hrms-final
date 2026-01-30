@@ -3,14 +3,14 @@ version: "3.9"
 services:
   exam-portal-backend:
     build: ./backend
-    container_name: flask_backend
+    container_name: exam_app_backend
     restart: always
     ports:
       - "5001:5001"
 
   exam-portal-frontend:
     build: ./frontend
-    container_name: react_frontend
+    container_name: exam_app_frontend
     restart: always
     ports:
       - "3001:3001"

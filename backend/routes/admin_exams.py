@@ -61,8 +61,17 @@ def create_exam():
 
     testName = str(payload["testName"]).strip()
     duration = int(payload["duration"])
-    sections = payload.get("sections") or []
+    sections_input = payload.get("sections") or []
     questions = payload.get("questions") or []
+
+    # Extract section names if sections is array of objects
+    sections = []
+    for s in sections_input:
+        if isinstance(s, dict):
+            sections.append(s.get("name", ""))
+        else:
+            sections.append(str(s))
+    sections = [s for s in sections if s]  # Remove empty strings
 
     if not isinstance(sections, list) or len(sections) == 0:
         return jsonify({"error": "sections must be a non-empty list"}), 400
@@ -75,7 +84,7 @@ def create_exam():
         "name": testName,
         "duration": duration,
         "sections": sections,
-        "status": "draft",
+        "status": "active",
         "questionCount": len(questions),
         "createdAt": now,
         "updatedAt": now,
@@ -185,10 +194,21 @@ def update_exam(exam_id: str):
         return jsonify({"error": "Exam not found"}), 404
 
     now = datetime.utcnow()
+    sections_input = payload.get("sections") or []
+
+    # Extract section names if sections is array of objects
+    sections = []
+    for s in sections_input:
+        if isinstance(s, dict):
+            sections.append(s.get("name", ""))
+        else:
+            sections.append(str(s))
+    sections = [s for s in sections if s]  # Remove empty strings
+
     update = {
         "name": str(payload["testName"]).strip(),
         "duration": int(payload["duration"]),
-        "sections": payload.get("sections") or [],
+        "sections": sections,
         "questionCount": len(payload.get("questions") or []),
         "updatedAt": now,
     }

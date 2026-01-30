@@ -47,6 +47,42 @@ def dashboard():
     })
 
 
+@answerer_bp.get("/history")
+def get_history():
+    """Return test history for a user.
+
+    Query param: userId
+    """
+    userId = (request.args.get("userId") or "").strip()
+    if not userId:
+        return jsonify({"error": "userId is required"}), 400
+
+    db = get_db()
+    
+    # Get all results for this user, sorted by submission date (most recent first)
+    results = list(db.results.find({"userId": userId}).sort("submittedAt", -1))
+    
+    history = []
+    for r in results:
+        # Get exam name
+        exam = db.exams.find_one({"_id": r.get("examId")})
+        exam_name = exam.get("name", "Unknown Test") if exam else "Unknown Test"
+        
+        history.append({
+            "attemptId": str(r.get("_id")),
+            "examId": str(r.get("examId")),
+            "testName": exam_name,
+            "submittedAt": r.get("submittedAt").isoformat() if r.get("submittedAt") else None,
+            "scoredMarks": r.get("scoredMarks", 0),
+            "totalMarks": r.get("totalMarks", 0),
+            "percentage": round(float(r.get("percentage", 0.0)), 2),
+            "passed": r.get("passed", False),
+            "timeSpentSec": r.get("timeSpentSec", 0),
+        })
+    
+    return jsonify({"history": to_jsonable(history)})
+
+
 @answerer_bp.get("/tests")
 def list_assigned_tests():
     """List tests assigned to a user.

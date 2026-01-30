@@ -48,7 +48,13 @@ const TestEditor: React.FC<TestEditorProps> = ({ testId, onBack }) => {
       
       setTestName(test.testName || test.name || '');
       setDuration(test.duration || 60);
-      setSections(test.sections || ['General']);
+      const normalizedSections = (test.sections || ['General'])
+        .map((s: any) => typeof s === 'string' ? s : s.name)
+        .map((s: string) => s?.trim())
+        .filter((s: string) => s);
+
+      setSections(normalizedSections);
+
       
       // Convert questions from backend format
       const loadedQuestions: Question[] = (test.questions || []).map((q: any) => ({
@@ -57,9 +63,12 @@ const TestEditor: React.FC<TestEditorProps> = ({ testId, onBack }) => {
         question: q.question,
         options: q.options || [],
         correctAnswer: q.correctAnswer,
-        section: q.section,
+        section: q.section?.trim() || 'General',
         marks: q.marks || 1,
       }));
+      
+      console.log('Loaded questions:', loadedQuestions);
+      console.log('Sections:', normalizedSections);
       
       setQuestions(loadedQuestions);
       
@@ -142,7 +151,9 @@ const TestEditor: React.FC<TestEditorProps> = ({ testId, onBack }) => {
   };
 
   const getQuestionsBySection = (section: string) => {
-    return questions.filter(q => q.section === section);
+    return questions.filter(q => 
+      q.section?.trim().toLowerCase() === section?.trim().toLowerCase()
+    );
   };
 
   const handleUpdateTest = async () => {
@@ -359,6 +370,10 @@ const TestEditor: React.FC<TestEditorProps> = ({ testId, onBack }) => {
 
         {sections.map((section) => {
           const sectionQuestions = getQuestionsBySection(section);
+          
+          // Debug logging
+          console.log(`Section: ${section}, Questions:`, sectionQuestions);
+          
           if (sectionQuestions.length === 0) return null;
 
           return (

@@ -261,3 +261,57 @@
     max-width: none;
   }
 }
+
+.page-with-topbar {
+  padding-top: 2rem; /* matches topbar height */
+}
+
+/* Section chips (clean + editable) */
+.section-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.75rem;
+  background: #ebf5ff;
+  border-radius: 999px;
+  border: 1px solid #cfe3ff;
+  font-size: 0.85rem;
+}
+
+.section-name {
+  color: #0070f2;
+  font-weight: 500;
+}
+
+/* Edit input */
+.section-edit-input {
+  border: 1px solid #0070f2;
+  border-radius: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.85rem;
+  width: 8rem;
+  outline: none;
+}
+
+/* Action buttons */
+.section-actions {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.icon-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 0;
+  color: #0070f2;
+}
+
+.icon-btn:hover {
+  opacity: 0.8;
+}
+
+.icon-btn.danger {
+  color: #d32f2f;
+}

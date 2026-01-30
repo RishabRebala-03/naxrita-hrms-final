@@ -8,7 +8,7 @@ interface Question {
   question: string;
   options?: string[];
   correctAnswer?: string | string[];
-  section: string;
+  section: string; // sectionId now
   marks: number;
 }
 
@@ -19,27 +19,48 @@ interface TestBuilderProps {
 const TestBuilder: React.FC<TestBuilderProps> = ({ onBack }) => {
   const [testName, setTestName] = useState('');
   const [duration, setDuration] = useState(60);
-  const [sections, setSections] = useState<string[]>(['General']);
+  interface Section {
+    id: string;
+    name: string;
+  }
+  const [sections, setSections] = useState<Section[]>([
+    { id: 'general', name: 'General' }
+  ]);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [showQuestionForm, setShowQuestionForm] = useState(false);
   const [newSection, setNewSection] = useState('');
-
+  const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
   const [questionForm, setQuestionForm] = useState({
     type: 'mcq' as 'mcq' | 'multiple' | 'text',
     question: '',
     options: ['', '', '', ''],
     correctAnswer: '',
     correctAnswers: [] as string[],
-    section: 'General',
+    section: sections[0]?.id || '',
     marks: 1,
   });
 
   const addSection = () => {
-    if (newSection.trim() && !sections.includes(newSection.trim())) {
-      setSections([...sections, newSection.trim()]);
-      setNewSection('');
-    }
+    const name = newSection.trim();
+    if (!name) return;
+
+    const exists = sections.some(
+      (s) => s.name.toLowerCase() === name.toLowerCase()
+    );
+
+    if (exists) return;
+
+    setSections([
+      ...sections,
+      {
+        id: Date.now().toString(),
+        name,
+      },
+    ]);
+
+    setNewSection('');
   };
+
 
   const addQuestion = () => {
     const newQuestion: Question = {
@@ -100,8 +121,8 @@ const TestBuilder: React.FC<TestBuilderProps> = ({ onBack }) => {
     }
   };
 
-  const getQuestionsBySection = (section: string) => {
-    return questions.filter(q => q.section === section);
+  const getQuestionsBySection = (sectionId: string) => {
+    return questions.filter(q => q.section === sectionId);
   };
 
   const handleSaveTest = async () => {
@@ -116,11 +137,23 @@ const TestBuilder: React.FC<TestBuilderProps> = ({ onBack }) => {
     }
 
     try {
+      // Convert sections from {id, name} objects to just names (strings)
+      const sectionNames = sections.map(s => s.name);
+      
+      // Convert questions section IDs to section names
+      const questionsWithSectionNames = questions.map(q => {
+        const sectionObj = sections.find(s => s.id === q.section);
+        return {
+          ...q,
+          section: sectionObj ? sectionObj.name : q.section
+        };
+      });
+
       await apiPost("/admin/exams", {
         testName,
         duration,
-        sections,
-        questions,
+        sections: sectionNames,
+        questions: questionsWithSectionNames,
       });
 
       alert("Test saved successfully");
@@ -133,7 +166,7 @@ const TestBuilder: React.FC<TestBuilderProps> = ({ onBack }) => {
 
 
   return (
-    <div className="test-builder">
+    <div className="test-builder page-with-topbar">
       <div className="page-header">
         <h2>Create New Test</h2>
         <button className="secondary-btn" onClick={onBack}>
@@ -168,9 +201,63 @@ const TestBuilder: React.FC<TestBuilderProps> = ({ onBack }) => {
           <h4>Sections</h4>
           <div className="section-tags">
             {sections.map((section) => (
-              <span key={section} className="section-tag">
-                {section}
-              </span>
+              <div key={section.id} className="section-chip">
+                {editingSectionId === section.id ? (
+                  <input
+                    className="section-edit-input"
+                    value={section.name}
+                    autoFocus
+                    onChange={(e) => {
+                      const newName = e.target.value;
+                      setSections(sections.map(s =>
+                        s.id === section.id ? { ...s, name: newName } : s
+                      ));
+                    }}
+                    onBlur={() => setEditingSectionId(null)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        setEditingSectionId(null);
+                      }
+                    }}
+                  />
+                ) : (
+                  <span className="section-name">{section.name}</span>
+                )}
+
+                <div className="section-actions">
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    title="Edit section"
+                    onClick={() => setEditingSectionId(section.id)}
+                  >
+                    ✏️
+                  </button>
+
+                  <button
+                    type="button"
+                    className="icon-btn danger"
+                    title="Delete section"
+                    onClick={() => {
+                      const remainingSections = sections.filter(s => s.id !== section.id);
+
+                      setSections(remainingSections);
+                      setQuestions(questions.filter(q => q.section !== section.id));
+
+                      // 🔑 IMPORTANT: reset selected section if needed
+                      setQuestionForm((prev) => ({
+                        ...prev,
+                        section:
+                          prev.section === section.id
+                            ? remainingSections[0]?.id || ''
+                            : prev.section,
+                      }));
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
             ))}
           </div>
           <div className="add-section">
@@ -223,8 +310,8 @@ const TestBuilder: React.FC<TestBuilderProps> = ({ onBack }) => {
                   }
                 >
                   {sections.map((section) => (
-                    <option key={section} value={section}>
-                      {section}
+                    <option key={section.id} value={section.id}>
+                      {section.name}
                     </option>
                   ))}
                 </select>
@@ -310,12 +397,12 @@ const TestBuilder: React.FC<TestBuilderProps> = ({ onBack }) => {
         )}
 
         {sections.map((section) => {
-          const sectionQuestions = getQuestionsBySection(section);
+          const sectionQuestions = getQuestionsBySection(section.id);
           if (sectionQuestions.length === 0) return null;
 
           return (
-            <div key={section} className="section-block">
-              <h4>{section} ({sectionQuestions.length} questions)</h4>
+            <div key={section.id} className="section-block">
+              <h4>{section.name} ({sectionQuestions.length} questions)</h4>
               <div className="questions-list">
                 {sectionQuestions.map((q, index) => (
                   <div key={q.id} className="question-card">

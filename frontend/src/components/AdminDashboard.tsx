@@ -3,10 +3,11 @@ import UserManagement from './UserManagement';
 import TestBuilder from './TestBuilder';
 import TestEditor from './TestEditor';
 import TestList from './TestList';
+import TestResults from './TestResults';
 import './AdminDashboard.css';
 import { apiGet } from '../services/api';
 
-type AdminView = 'dashboard' | 'users' | 'create-test' | 'edit-test' | 'tests';
+type AdminView = 'dashboard' | 'users' | 'create-test' | 'edit-test' | 'tests' | 'results';
 
 interface AdminDashboardProps {
   adminName: string;
@@ -72,6 +73,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ adminName, onLogout }) 
         ) : null;
       case 'tests':
         return <TestList onCreateNew={() => setCurrentView('create-test')} onEditTest={handleEditTest} />;
+      case 'results':
+        return <TestResults />;
       default:
         return (
           <>
@@ -150,6 +153,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ adminName, onLogout }) 
           >
             <span className="nav-icon">📝</span>
             Tests
+          </button>
+          <button
+            className={`nav-item ${currentView === 'results' ? 'active' : ''}`}
+            onClick={() => setCurrentView('results')}
+          >
+            <span className="nav-icon">📈</span>
+            Test Results
           </button>
         </nav>
         <div className="sidebar-footer">

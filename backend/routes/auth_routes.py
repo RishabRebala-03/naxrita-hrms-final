@@ -52,3 +52,47 @@ def login():
         "role": user.get("role"),
     }
     return jsonify({"user": to_jsonable(res_user)})
+
+@auth_bp.post("/change-password")
+def change_password():
+    """
+    Payload:
+    {
+      "userId": "...",
+      "oldPassword": "...",
+      "newPassword": "...",
+      "role": "admin" | "answerer"
+    }
+    """
+    payload = request.get_json(silent=True) or {}
+    ok, msg = require_fields(payload, ["userId", "oldPassword", "newPassword", "role"])
+    if not ok:
+        return jsonify({"error": msg}), 400
+
+    userId = str(payload["userId"]).strip()
+    old_password = str(payload["oldPassword"]).strip()
+    new_password = str(payload["newPassword"]).strip()
+    role = str(payload["role"]).strip()
+
+    if old_password == new_password:
+        return jsonify({"error": "New password cannot be same as old password"}), 400
+
+    db = get_db()
+    user = db.users.find_one({"userId": userId, "role": role})
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    if user.get("password") != old_password:
+        return jsonify({"error": "Old password is incorrect"}), 401
+
+    db.users.update_one(
+        {"_id": user["_id"]},
+        {
+            "$set": {
+                "password": new_password,
+                "passwordUpdatedAt": datetime.utcnow()
+            }
+        }
+    )
+
+    return jsonify({"message": "Password updated successfully"})

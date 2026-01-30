@@ -1,11 +1,13 @@
 .test-list {
-  max-width: 75rem;
+  max-width: 100%;
+  padding-right: 2rem;
 }
 
-.tests-grid {
+.test-list .tests-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(22rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(26rem, 1fr));
   gap: 1.5rem;
+  width: 100%;
 }
 
 .test-card {
@@ -14,6 +16,7 @@
   box-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.05);
   transition: all 0.2s ease;
   overflow: hidden;
+  width: 100%;
 }
 
 .test-card:hover {
@@ -274,4 +277,18 @@
   .action-btn {
     width: 100%;
   }
+}
+
+.test-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.test-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  margin-bottom: 1rem;
 }
