@@ -23,12 +23,11 @@ import AdminLogs from "./components/AdminLogs";
 import TeaCoffee from "./components/TeaCoffee";
 import Policy from "./components/Policy";
 import Projects from "./components/Projects";
+import Timesheets from "./components/Timesheets";
 
-// ✅ CHANGE #1: ADD THIS NEW COMPONENT RIGHT AFTER IMPORTS
-// This injects critical CSS to fix mobile scrolling
+// Injects critical CSS to fix mobile scrolling
 const MobileScrollFix = () => (
   <style>{`
-    /* Emergency mobile scroll fix - overrides any conflicting styles */
     @media (max-width: 480px) {
       html, body, #root {
         overflow-x: hidden !important;
@@ -36,26 +35,21 @@ const MobileScrollFix = () => (
         height: auto !important;
         min-height: 100vh;
       }
-      
       .app-root {
         height: auto !important;
         min-height: 100vh;
       }
-      
       .main {
         height: auto !important;
         min-height: 100vh;
         overflow-y: auto !important;
         -webkit-overflow-scrolling: touch;
       }
-      
       .content {
         overflow: visible !important;
         height: auto !important;
         padding-bottom: 60px !important;
       }
-      
-      /* Fix for iOS Safari bottom bar */
       @supports (-webkit-touch-callout: none) {
         .content {
           padding-bottom: 100px !important;
@@ -65,28 +59,27 @@ const MobileScrollFix = () => (
   `}</style>
 );
 
-// Nuclear option scroll fix - forces scroll on mount
+// Forces scroll fix on mount for mobile
 const ForceScroll = () => {
   React.useEffect(() => {
     if (window.innerWidth <= 480) {
       console.log('🔧 MOBILE DETECTED - Forcing scroll fix...');
-      
-      // Force body to scroll
+
       document.documentElement.style.setProperty('overflow-y', 'scroll', 'important');
       document.documentElement.style.setProperty('height', 'auto', 'important');
       document.documentElement.style.setProperty('min-height', '100vh', 'important');
-      
+
       document.body.style.setProperty('overflow-y', 'scroll', 'important');
       document.body.style.setProperty('height', 'auto', 'important');
       document.body.style.setProperty('min-height', '100vh', 'important');
-      
+
       const root = document.getElementById('root');
       if (root) {
         root.style.setProperty('overflow-y', 'visible', 'important');
         root.style.setProperty('height', 'auto', 'important');
         root.style.setProperty('min-height', '100vh', 'important');
       }
-      
+
       const main = document.querySelector('.main');
       if (main) {
         main.style.setProperty('overflow-y', 'scroll', 'important');
@@ -94,21 +87,21 @@ const ForceScroll = () => {
         main.style.setProperty('min-height', '100vh', 'important');
         main.style.setProperty('-webkit-overflow-scrolling', 'touch', 'important');
       }
-      
+
       const content = document.querySelector('.content');
       if (content) {
         content.style.setProperty('overflow', 'visible', 'important');
         content.style.setProperty('height', 'auto', 'important');
         content.style.setProperty('padding-bottom', '100px', 'important');
       }
-      
+
       console.log('✅ Scroll fix applied!');
       console.log('Body scrollHeight:', document.body.scrollHeight);
       console.log('Window innerHeight:', window.innerHeight);
       console.log('Can scroll:', document.body.scrollHeight > window.innerHeight);
     }
   }, []);
-  
+
   return null;
 };
 
@@ -119,7 +112,7 @@ function App() {
   const [viewEmployeeId, setViewEmployeeId] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // ✅ Session recovery on app load
+  // Session recovery on app load
   React.useEffect(() => {
     const savedUser = localStorage.getItem('user');
     if (savedUser && !currentUser) {
@@ -135,7 +128,7 @@ function App() {
     }
   }, []);
 
-  // ✅ Save session whenever user changes
+  // Save session whenever user changes
   React.useEffect(() => {
     if (currentUser) {
       localStorage.setItem('user', JSON.stringify(currentUser));
@@ -143,7 +136,7 @@ function App() {
     }
   }, [currentUser]);
 
-  // ✅ Debug logger to track user state changes
+  // Debug logger to track user state changes
   React.useEffect(() => {
     console.log('🔍 User state changed:', currentUser ? `Logged in as ${currentUser.name}` : 'Logged out');
   }, [currentUser]);
@@ -161,7 +154,6 @@ function App() {
   const handleLogout = () => {
     localStorage.removeItem('user');
     console.log('👋 User logged out, session cleared');
-    
     setCurrentUser(null);
     setIsAuthenticated(false);
     setSection("dashboard");
@@ -171,25 +163,25 @@ function App() {
   const handleNavigateToProfile = (employeeId) => {
     console.log("🔍 Navigation requested with:", employeeId);
     console.log("   Type:", typeof employeeId);
-    
+
     let targetId = employeeId;
-    
+
     if (!employeeId) {
       console.error("❌ No employee ID provided");
       alert("Error: No employee ID provided");
       return;
     }
-    
+
     if (typeof employeeId === "object" && employeeId !== null) {
       console.warn("⚠️ Object passed to navigation, extracting ID...");
       console.log("   Object keys:", Object.keys(employeeId));
       console.log("   Full object:", JSON.stringify(employeeId, null, 2));
-      
-      targetId = employeeId._id || 
-                employeeId.id || 
-                employeeId.employeeId ||
-                null;
-      
+
+      targetId = employeeId._id ||
+                 employeeId.id ||
+                 employeeId.employeeId ||
+                 null;
+
       if (targetId) {
         console.log("✅ Extracted ID from object:", targetId);
       } else {
@@ -198,25 +190,25 @@ function App() {
         return;
       }
     }
-    
+
     if (typeof targetId !== "string") {
       console.error("❌ targetId is not a string:", targetId, "Type:", typeof targetId);
       alert("Error: Invalid employee ID format (not a string)");
       return;
     }
-    
+
     if (targetId === "[object Object]" || targetId.includes("[object")) {
       console.error("❌ targetId is a stringified object:", targetId);
       alert("Error: Invalid employee ID (stringified object)");
       return;
     }
-    
+
     if (!/^[a-f0-9]{24}$/i.test(targetId)) {
       console.error("❌ Invalid MongoDB ObjectId format:", targetId);
       alert(`Error: Invalid employee ID format. Expected 24 hex characters, got: ${targetId}`);
       return;
     }
-    
+
     console.log("✅ All validations passed, navigating to profile:", targetId);
     setViewEmployeeId(targetId);
     setSection("profile");
@@ -286,6 +278,13 @@ function App() {
     }
   };
 
+  const AccessDenied = () => (
+    <div style={{ padding: 40, color: "#ef4444" }}>
+      <h2>🚫 Access Denied</h2>
+      <p>You do not have permission to access this section.</p>
+    </div>
+  );
+
   const renderSection = () => {
     switch (section) {
       case "dashboard":
@@ -293,8 +292,8 @@ function App() {
           return <AdminDashboard user={currentUser} />;
         } else if (role === "Manager") {
           return (
-            <ManagerDashboard 
-              user={currentUser} 
+            <ManagerDashboard
+              user={currentUser}
               onNavigateToProfile={handleNavigateToProfile}
             />
           );
@@ -361,6 +360,10 @@ function App() {
       case "projects":
         return role === "Admin" ? <Projects user={currentUser} /> : <AccessDenied />;
 
+      // ✅ Timesheets - available to all roles
+      case "timesheets":
+        return <Timesheets user={currentUser} />;
+
       default:
         if (role === "Admin") {
           return <AdminDashboard user={currentUser} />;
@@ -372,20 +375,10 @@ function App() {
     }
   };
 
-  const AccessDenied = () => (
-    <div style={{ padding: 40, color: "#ef4444" }}>
-      <h2>🚫 Access Denied</h2>
-      <p>You do not have permission to access this section.</p>
-    </div>
-  );
-
-  // ✅ CHANGE #2: MODIFY THE RETURN STATEMENT
-  // Replace the existing return statement with this:
   return (
     <>
-      {/* ✅ ADD THIS LINE - Inject scroll fix styles */}
       <MobileScrollFix />
-      <ForceScroll /> 
+      <ForceScroll />
       <div className="app-root">
         <div
           className="sidebar-backdrop"

@@ -1,11 +1,74 @@
-// src/components/Topbar.js
-import React, { useState } from "react";
+// src/components/Topbar.js - MOBILE VIEWPORT FIX V4
+import React, { useState, useEffect, useRef } from "react";
 import UniversalSearch from "./UniversalSearch";
-import Notifications from "./Notifications";  // ⭐ NEW IMPORT
+import Notifications from "./Notifications";
 
 const Topbar = ({ user, onLogout, onNavigateToProfile, onToggleSidebar }) => {
   console.log("🔍 Topbar user data:", user);
   const [showDropdown, setShowDropdown] = useState(false);
+  const containerRef = useRef(null);
+
+  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 480;
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    if (!showDropdown) return;
+
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setShowDropdown(false);
+      }
+    };
+
+    setTimeout(() => {
+      document.addEventListener('click', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside);
+    }, 0);
+
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+      if (isMobile) {
+        document.body.style.overflow = '';
+      }
+    };
+  }, [showDropdown, isMobile]);
+
+  const handleToggleDropdown = (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setShowDropdown(!showDropdown);
+  };
+
+  const handleBackdropClick = (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setShowDropdown(false);
+  };
+
+  const handleProfileClick = (e) => {
+    e.stopPropagation();
+    setShowDropdown(false);
+    const userId = user._id || user.id;
+    console.log("🔍 Topbar navigating with ID:", userId);
+    onNavigateToProfile(userId);
+  };
+
+  const handleLogoutClick = (e) => {
+    e.stopPropagation();
+    setShowDropdown(false);
+    onLogout();
+  };
+
+  // CRITICAL FIX: Calculate proper positioning for mobile
+  const getDropdownStyle = () => ({
+    position: "fixed",
+    top: 72,
+    right: 12,
+    left: "auto",
+    minWidth: 220,
+    maxWidth: "calc(100vw - 24px)",
+  });
 
   return (
     <header className="topbar">
@@ -32,13 +95,21 @@ const Topbar = ({ user, onLogout, onNavigateToProfile, onToggleSidebar }) => {
 
       {/* RIGHT SIDE - Notifications + User Dropdown */}
       <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-        {/* ⭐ NEW: Notifications Component */}
+        {/* ⭐ Notifications Component */}
         <Notifications currentUser={user} />
 
-        {/* User Dropdown (existing code) */}
-        <div style={{ position: "relative" }}>
+        {/* User Dropdown */}
+        <div 
+          ref={containerRef}
+          className="profile-dropdown-container"
+          style={{ position: "relative" }}
+        >
           <button
-            onClick={() => setShowDropdown(!showDropdown)}
+            onClick={handleToggleDropdown}
+            onTouchEnd={(e) => {
+              e.preventDefault();
+              handleToggleDropdown(e);
+            }}
             style={{
               display: "flex",
               alignItems: "center",
@@ -106,29 +177,33 @@ const Topbar = ({ user, onLogout, onNavigateToProfile, onToggleSidebar }) => {
             <>
               {/* Backdrop */}
               <div
+                onClick={handleBackdropClick}
+                onTouchEnd={(e) => {
+                  e.preventDefault();
+                  handleBackdropClick(e);
+                }}
                 style={{
                   position: "fixed",
                   top: 0,
                   left: 0,
                   right: 0,
                   bottom: 0,
-                  zIndex: 999,
+                  background: "rgba(0, 0, 0, 0.5)",
+                  zIndex: 9998,
                 }}
-                onClick={() => setShowDropdown(false)}
               />
               
               {/* Dropdown Menu */}
               <div
+                className="profile-dropdown-menu"
+                onClick={(e) => e.stopPropagation()}
                 style={{
-                  position: "absolute",
-                  top: "calc(100% + 8px)",
-                  right: 0,
+                  ...getDropdownStyle(),
                   background: "white",
                   border: "1px solid #e5e7eb",
                   borderRadius: 12,
-                  boxShadow: "0 10px 40px rgba(0,0,0,0.15)",
-                  minWidth: 220,
-                  zIndex: 1000,
+                  boxShadow: "0 20px 60px rgba(0,0,0,0.35)",
+                  zIndex: 9999,
                   overflow: "hidden",
                 }}
               >
@@ -142,15 +217,14 @@ const Topbar = ({ user, onLogout, onNavigateToProfile, onToggleSidebar }) => {
                 </div>
 
                 <button
-                  onClick={() => {
-                    setShowDropdown(false);
-                    const userId = user._id || user.id;
-                    console.log("🔍 Topbar navigating with ID:", userId);
-                    onNavigateToProfile(user.id || user._id);
+                  onClick={handleProfileClick}
+                  onTouchEnd={(e) => {
+                    e.preventDefault();
+                    handleProfileClick(e);
                   }}
                   style={{
                     width: "100%",
-                    padding: "12px 16px",
+                    padding: isMobile ? "16px 18px" : "12px 16px",
                     border: "none",
                     background: "transparent",
                     textAlign: "left",
@@ -161,9 +235,11 @@ const Topbar = ({ user, onLogout, onNavigateToProfile, onToggleSidebar }) => {
                     alignItems: "center",
                     gap: 10,
                     transition: "background 0.2s ease",
+                    minHeight: isMobile ? 52 : 44,
                   }}
                   onMouseEnter={(e) => e.currentTarget.style.background = "#f3f4f6"}
                   onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+                  onTouchStart={(e) => e.currentTarget.style.background = "#f3f4f6"}
                 >
                   <span style={{ fontSize: 16 }}>👤</span>
                   <span>My Profile</span>
@@ -172,13 +248,14 @@ const Topbar = ({ user, onLogout, onNavigateToProfile, onToggleSidebar }) => {
                 <div style={{ height: 1, background: "#e5e7eb" }} />
 
                 <button
-                  onClick={() => {
-                    setShowDropdown(false);
-                    onLogout();
+                  onClick={handleLogoutClick}
+                  onTouchEnd={(e) => {
+                    e.preventDefault();
+                    handleLogoutClick(e);
                   }}
                   style={{
                     width: "100%",
-                    padding: "12px 16px",
+                    padding: isMobile ? "16px 18px" : "12px 16px",
                     border: "none",
                     background: "transparent",
                     textAlign: "left",
@@ -189,9 +266,11 @@ const Topbar = ({ user, onLogout, onNavigateToProfile, onToggleSidebar }) => {
                     alignItems: "center",
                     gap: 10,
                     transition: "background 0.2s ease",
+                    minHeight: isMobile ? 52 : 44,
                   }}
                   onMouseEnter={(e) => e.currentTarget.style.background = "#fef2f2"}
                   onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+                  onTouchStart={(e) => e.currentTarget.style.background = "#fef2f2"}
                 >
                   <span style={{ fontSize: 16 }}>🚪</span>
                   <span>Logout</span>

@@ -1,10 +1,32 @@
-# notification_routes.py
+# notification_routes.py - WITH PROPER DATE SERIALIZATION
 from flask import Blueprint, request, jsonify
 from bson import ObjectId
 from datetime import datetime
 from config.db import mongo
 
 notification_bp = Blueprint("notification_bp", __name__)
+
+
+def serialize_notification(notification):
+    """Helper function to properly serialize notification data"""
+    if not notification:
+        return None
+    
+    # Convert ObjectIds to strings
+    notification["_id"] = str(notification["_id"])
+    notification["user_id"] = str(notification["user_id"])
+    
+    if "related_leave_id" in notification:
+        notification["related_leave_id"] = str(notification["related_leave_id"])
+    
+    # Convert datetime objects to ISO strings
+    if "createdAt" in notification and isinstance(notification["createdAt"], datetime):
+        notification["createdAt"] = notification["createdAt"].isoformat()
+    
+    if "readAt" in notification and isinstance(notification["readAt"], datetime):
+        notification["readAt"] = notification["readAt"].isoformat()
+    
+    return notification
 
 
 # -------------------------------
@@ -59,20 +81,23 @@ def get_user_notifications(user_id):
             "user_id": ObjectId(user_id)
         }).sort("createdAt", -1).limit(50))  # Last 50 notifications
         
+        # Serialize all notifications
+        serialized_notifications = []
         for notif in notifications:
-            notif["_id"] = str(notif["_id"])
-            notif["user_id"] = str(notif["user_id"])
-            if "related_leave_id" in notif:
-                notif["related_leave_id"] = str(notif["related_leave_id"])
+            serialized = serialize_notification(notif)
+            if serialized:
+                serialized_notifications.append(serialized)
         
-        unread_count = sum(1 for n in notifications if not n.get("read", False))
+        unread_count = sum(1 for n in serialized_notifications if not n.get("read", False))
         
         return jsonify({
-            "notifications": notifications,
+            "notifications": serialized_notifications,
             "unreadCount": unread_count
         }), 200
     except Exception as e:
         print(f"❌ Error fetching notifications: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 
@@ -179,4 +204,6 @@ def clear_all_notifications(user_id):
         }), 200
     except Exception as e:
         print(f"❌ Error clearing notifications: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500

@@ -323,3 +323,275 @@ html {
   animation: fadeSlideUp 1.2s ease-out both;
   animation-delay: 0.4s;
 }
+
+/* =============================================== */
+/* 📱 MOBILE RESPONSIVENESS                        */
+/* =============================================== */
+
+/* Tablets and smaller laptops (1024px and below) */
+@media (max-width: 1024px) {
+  .login-right {
+    padding: 60px 40px;
+  }
+  
+  .login-card {
+    padding: 48px 48px;
+    max-width: 420px;
+  }
+  
+  .apple-logo {
+    width: 320px;
+  }
+  
+  .apple-title {
+    font-size: 3.5rem;
+    letter-spacing: 6px;
+  }
+  
+  .portal-title {
+    font-size: 2.5rem;
+  }
+}
+
+/* Tablets (768px and below) - Stack layout */
+@media (max-width: 768px) {
+  .login-page {
+    flex-direction: column;
+  }
+  
+  .login-left.apple-dark {
+    min-height: 35vh;
+    padding: 30px 20px;
+  }
+  
+  .login-right {
+    padding: 40px 24px;
+    min-height: 65vh;
+  }
+  
+  .apple-logo {
+    width: 240px;
+    margin-bottom: -15px;
+  }
+  
+  .apple-title {
+    font-size: 2.75rem;
+    letter-spacing: 5px;
+  }
+  
+  .apple-subtitle {
+    font-size: 0.85rem;
+    letter-spacing: 1.5px;
+  }
+  
+  .portal-header {
+    margin-bottom: 32px;
+  }
+  
+  .portal-title {
+    font-size: 2rem;
+    padding-bottom: 16px;
+  }
+  
+  .portal-title::after {
+    width: 60px;
+  }
+  
+  .login-card {
+    padding: 40px 32px;
+    max-width: 100%;
+    border-radius: 16px;
+  }
+  
+  .login-title {
+    font-size: 1.875rem;
+  }
+  
+  .login-subtitle {
+    font-size: 0.9rem;
+  }
+}
+
+/* Mobile devices (480px and below) */
+@media (max-width: 480px) {
+  .login-left.apple-dark {
+    min-height: 30vh;
+    padding: 24px 16px;
+  }
+  
+  .login-right {
+    padding: 32px 20px;
+    min-height: 70vh;
+  }
+  
+  .apple-logo {
+    width: 180px;
+    margin-bottom: -12px;
+  }
+  
+  .apple-title {
+    font-size: 2rem;
+    letter-spacing: 3px;
+  }
+  
+  .apple-subtitle {
+    font-size: 0.75rem;
+    letter-spacing: 1px;
+    margin-top: 6px;
+  }
+  
+  .portal-header {
+    margin-bottom: 24px;
+  }
+  
+  .portal-title {
+    font-size: 1.75rem;
+    padding-bottom: 12px;
+  }
+  
+  .portal-title::after {
+    width: 50px;
+  }
+  
+  .login-card {
+    padding: 32px 24px;
+    border-radius: 14px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08), 
+                0 4px 12px rgba(0, 0, 0, 0.04);
+  }
+  
+  .login-title {
+    font-size: 1.625rem;
+  }
+  
+  .login-subtitle {
+    font-size: 0.85rem;
+    margin-top: 6px;
+  }
+  
+  .input-group {
+    margin-bottom: 16px;
+  }
+  
+  .input-group label {
+    font-size: 0.8125rem;
+    margin-bottom: 6px;
+  }
+  
+  .input-group input {
+    padding: 12px 14px;
+    font-size: 0.9rem;
+    border-radius: 8px;
+  }
+  
+  .login-btn {
+    padding: 13px 20px;
+    font-size: 0.9rem;
+    border-radius: 8px;
+  }
+  
+  .error-box {
+    padding: 9px 12px;
+    font-size: 0.85rem;
+    border-radius: 6px;
+  }
+  
+  .toggle-password {
+    right: 10px;
+    top: 32px;
+    font-size: 0.8rem;
+  }
+}
+
+/* Extra small devices (360px and below) */
+@media (max-width: 360px) {
+  .login-left.apple-dark {
+    min-height: 28vh;
+    padding: 20px 12px;
+  }
+  
+  .login-right {
+    padding: 28px 16px;
+  }
+  
+  .apple-logo {
+    width: 150px;
+    margin-bottom: -10px;
+  }
+  
+  .apple-title {
+    font-size: 1.75rem;
+    letter-spacing: 2px;
+  }
+  
+  .apple-subtitle {
+    font-size: 0.7rem;
+  }
+  
+  .portal-title {
+    font-size: 1.5rem;
+  }
+  
+  .login-card {
+    padding: 28px 20px;
+  }
+  
+  .login-title {
+    font-size: 1.5rem;
+  }
+  
+  .login-subtitle {
+    font-size: 0.8rem;
+  }
+  
+  .input-group input {
+    padding: 11px 12px;
+    font-size: 0.875rem;
+  }
+  
+  .login-btn {
+    padding: 12px 18px;
+    font-size: 0.875rem;
+  }
+}
+
+/* Landscape orientation for mobile devices */
+@media (max-width: 768px) and (orientation: landscape) {
+  .login-left.apple-dark {
+    min-height: 40vh;
+  }
+  
+  .login-right {
+    min-height: 60vh;
+    padding: 32px 24px;
+  }
+  
+  .apple-logo {
+    width: 200px;
+  }
+  
+  .apple-title {
+    font-size: 2.25rem;
+  }
+  
+  .portal-header {
+    margin-bottom: 20px;
+  }
+  
+  .login-card {
+    padding: 32px 28px;
+  }
+}
+
+/* Prevent horizontal scroll on all devices */
+@media (max-width: 768px) {
+  body, html {
+    overflow-x: hidden;
+    width: 100%;
+  }
+  
+  .login-page {
+    overflow-x: hidden;
+    width: 100%;
+  }
+}

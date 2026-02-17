@@ -4,17 +4,18 @@ import logo from "../assets/naxicon.png";
 
 const Sidebar = ({ section, setSection, role, restricted = [], isOpen }) => {
   const buttons = [
-    { key: "dashboard", label: "🏠 Dashboard", roles: ["Admin", "Manager", "Employee"] },
-    { key: "employees", label: "👥 Employees", roles: ["Admin", "Manager"] },
-    { key: "leaves", label: "📋 Leaves", roles: ["Admin", "Manager", "Employee"] },
-    { key: "tea-coffee", label: "☕ Tea/Coffee", roles: ["Admin", "Manager", "Employee"] },
-    { key: "policy", label: "📄 Policy", roles: ["Admin", "Manager", "Employee"] },
-    { key: "projects", label: "📊 Projects", roles: ["Admin"] },
-    { key: "apply-behalf", label: "📝 Apply Leave on Behalf", roles: ["Admin"] },
-    { key: "logs", label: "📜 Change Logs", roles: ["Admin"] },
-    { key: "add", label: "➕ Add Employee", roles: ["Admin"] },
-    { key: "holidays", label: "🎉 Holidays", roles: ["Admin"] },
-    { key: "calendar", label: "📅 Calendar", roles: ["Admin", "Manager", "Employee"] },
+    { key: "dashboard",    label: "🏠 Dashboard",              roles: ["Admin", "Manager", "Employee"] },
+    { key: "employees",    label: "👥 Employees",              roles: ["Admin", "Manager"] },
+    { key: "leaves",       label: "📋 Leaves",                 roles: ["Admin", "Manager", "Employee"] },
+    { key: "tea-coffee",   label: "☕ Tea/Coffee",             roles: ["Admin", "Manager", "Employee"] },
+    { key: "timesheets",   label: "⏱️ Timesheets",            roles: ["Admin", "Manager", "Employee"] },
+    { key: "policy",       label: "📄 Policy",                 roles: ["Admin", "Manager", "Employee"] },
+    { key: "projects",     label: "📊 Projects",               roles: ["Admin"] },
+    { key: "apply-behalf", label: "📝 Apply Leave on Behalf",  roles: ["Admin"] },
+    { key: "logs",         label: "📜 Change Logs",            roles: ["Admin"] },
+    { key: "add",          label: "➕ Add Employee",           roles: ["Admin"] },
+    { key: "holidays",     label: "🎉 Holidays",               roles: ["Admin"] },
+    { key: "calendar",     label: "📅 Calendar",               roles: ["Admin", "Manager", "Employee"] },
   ];
 
   const visibleButtons = buttons.filter(
@@ -41,6 +42,7 @@ const Sidebar = ({ section, setSection, role, restricted = [], isOpen }) => {
           }}
         />
       </div>
+
       <nav className="nav" style={{ marginTop: 4 }}>
         {visibleButtons.map((btn) => (
           <button
@@ -52,6 +54,7 @@ const Sidebar = ({ section, setSection, role, restricted = [], isOpen }) => {
           </button>
         ))}
       </nav>
+
       <div className="footer">
         <div style={{ fontSize: 12 }}>© {new Date().getFullYear()} Naxrita</div>
       </div>

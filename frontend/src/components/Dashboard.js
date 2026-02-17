@@ -21,6 +21,303 @@ const getTimeBasedGreeting = () => {
 };
 
 
+// ========== NEW: On Leave Employees Modal ==========
+const OnLeaveEmployeesModal = ({ employees, onClose }) => {
+  const formatDate = (dateStr) => {
+    if (!dateStr) return "N/A";
+    try {
+      let val = dateStr;
+      if (typeof dateStr === "object" && dateStr.$date) val = dateStr.$date;
+      const date = new Date(val);
+      if (isNaN(date.getTime())) return "N/A";
+      return date.toLocaleDateString("en-IN", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      });
+    } catch {
+      return "N/A";
+    }
+  };
+
+  const getLeaveTypeIcon = (leaveType) => {
+    switch(leaveType?.toLowerCase()) {
+      case "casual": return "🖖";
+      case "sick": return "🤒";
+      case "optional": return "⭐";
+      case "planned": return "📅";
+      case "lwp": return "💼";
+      default: return "📋";
+    }
+  };
+
+  const getLeaveTypeColor = (leaveType) => {
+    switch(leaveType?.toLowerCase()) {
+      case "casual": return "#10b981";
+      case "sick": return "#ef4444";
+      case "optional": return "#f59e0b";
+      case "planned": return "#3b82f6";
+      case "lwp": return "#6b7280";
+      default: return "#9ca3af";
+    }
+  };
+
+  // Group employees by leave type
+  const groupedByType = employees.reduce((acc, emp) => {
+    const type = emp.leave_type || "Other";
+    if (!acc[type]) acc[type] = [];
+    acc[type].push(emp);
+    return acc;
+  }, {});
+
+  return (
+    <div style={{
+      position: "fixed",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: "rgba(0,0,0,0.5)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 1000,
+      padding: 20
+    }}>
+      <div style={{
+        background: "white",
+        borderRadius: 16,
+        maxWidth: 900,
+        width: "100%",
+        maxHeight: "90vh",
+        overflow: "auto",
+        boxShadow: "0 20px 60px rgba(0,0,0,0.3)"
+      }}>
+        {/* Header */}
+        <div style={{
+          padding: 24,
+          borderBottom: "2px solid #e5e7eb",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          position: "sticky",
+          top: 0,
+          background: "white",
+          zIndex: 10
+        }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 24, display: "flex", alignItems: "center", gap: 12 }}>
+              🖖 Employees On Leave Today
+            </h2>
+            <p style={{ margin: "8px 0 0 0", color: "#6b7280", fontSize: 14 }}>
+              {new Date().toLocaleDateString("en-IN", {
+                weekday: "long",
+                day: "numeric",
+                month: "long",
+                year: "numeric"
+              })} • {employees.length} employee{employees.length !== 1 ? 's' : ''} on leave
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              padding: "8px 16px",
+              background: "#ef4444",
+              color: "white",
+              border: "none",
+              borderRadius: 8,
+              cursor: "pointer",
+              fontWeight: 600,
+              fontSize: 14
+            }}
+          >
+            ✕ Close
+          </button>
+        </div>
+
+        {/* Summary Statistics */}
+        <div style={{
+          padding: 24,
+          background: "#f9fafb",
+          borderBottom: "1px solid #e5e7eb"
+        }}>
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+            gap: 16
+          }}>
+            {Object.entries(groupedByType).map(([type, emps]) => (
+              <div key={type} style={{
+                background: "white",
+                padding: 16,
+                borderRadius: 12,
+                border: "1px solid #e5e7eb",
+                textAlign: "center"
+              }}>
+                <div style={{ fontSize: 28, marginBottom: 4 }}>
+                  {getLeaveTypeIcon(type)}
+                </div>
+                <div style={{ 
+                  fontSize: 24, 
+                  fontWeight: 700, 
+                  color: getLeaveTypeColor(type),
+                  marginBottom: 4
+                }}>
+                  {emps.length}
+                </div>
+                <div style={{ fontSize: 13, color: "#6b7280", fontWeight: 600 }}>
+                  {type}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Employee List */}
+        <div style={{ padding: 24 }}>
+          {employees.length === 0 ? (
+            <div style={{ textAlign: "center", padding: 60, color: "#9ca3af" }}>
+              <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
+              <div style={{ fontSize: 16, fontWeight: 500 }}>Everyone is present!</div>
+              <div style={{ fontSize: 14, marginTop: 8 }}>No employees on leave today</div>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              {employees.map((employee, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    padding: 20,
+                    background: "#f9fafb",
+                    borderRadius: 12,
+                    border: "2px solid #e5e7eb",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "start"
+                  }}
+                >
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+                      <div style={{ fontSize: 32 }}>
+                        {getLeaveTypeIcon(employee.leave_type)}
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 18, fontWeight: 700, color: "#111827" }}>
+                          {employee.employee_name || "Unknown"}
+                        </div>
+                        <div style={{ fontSize: 13, color: "#6b7280", marginTop: 2 }}>
+                          {employee.employee_designation} • {employee.employee_department}
+                        </div>
+                        <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 2, fontFamily: "monospace" }}>
+                          {employee.employee_email}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ 
+                      display: "grid", 
+                      gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", 
+                      gap: 12,
+                      marginTop: 12,
+                      padding: 12,
+                      background: "white",
+                      borderRadius: 8,
+                      border: "1px solid #e5e7eb"
+                    }}>
+                      <div>
+                        <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 4, fontWeight: 600 }}>
+                          Leave Type
+                        </div>
+                        <div style={{ 
+                          fontSize: 14, 
+                          fontWeight: 700,
+                          color: getLeaveTypeColor(employee.leave_type)
+                        }}>
+                          {employee.leave_type}
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 4, fontWeight: 600 }}>
+                          Start Date
+                        </div>
+                        <div style={{ fontSize: 14, fontWeight: 600 }}>
+                          {formatDate(employee.start_date)}
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 4, fontWeight: 600 }}>
+                          End Date
+                        </div>
+                        <div style={{ fontSize: 14, fontWeight: 600 }}>
+                          {formatDate(employee.end_date)}
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 4, fontWeight: 600 }}>
+                          Duration
+                        </div>
+                        <div style={{ fontSize: 14, fontWeight: 600 }}>
+                          {employee.days} {employee.days === 1 ? "day" : "days"}
+                        </div>
+                      </div>
+                    </div>
+
+                    {employee.reason && (
+                      <div style={{ 
+                        marginTop: 12,
+                        padding: 12,
+                        background: "#fffbeb",
+                        borderRadius: 8,
+                        border: "1px solid #fcd34d"
+                      }}>
+                        <div style={{ fontSize: 11, color: "#92400e", marginBottom: 4, fontWeight: 600 }}>
+                          Reason
+                        </div>
+                        <div style={{ fontSize: 13, color: "#78350f", fontStyle: "italic" }}>
+                          {employee.reason}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{
+          padding: 24,
+          borderTop: "2px solid #e5e7eb",
+          background: "#f9fafb",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center"
+        }}>
+          <div style={{ fontSize: 13, color: "#6b7280" }}>
+            💡 Tip: Click on a leave type above to filter employees
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              padding: "10px 20px",
+              background: "#6b7280",
+              color: "white",
+              border: "none",
+              borderRadius: 8,
+              cursor: "pointer",
+              fontWeight: 600
+            }}
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
 const AdminDashboard = ({ user }) => {
   const [stats, setStats] = useState({
     totalEmployees: 0,
@@ -35,6 +332,8 @@ const AdminDashboard = ({ user }) => {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [showHierarchy, setShowHierarchy] = useState(false);
+  const [showOnLeaveModal, setShowOnLeaveModal] = useState(false);
+  const [employeesOnLeave, setEmployeesOnLeave] = useState([]);
 
   const fetchAdminData = async () => {
     try {
@@ -118,6 +417,9 @@ const AdminDashboard = ({ user }) => {
         const endDate = l.end_date;
         return startDate <= today && endDate >= today;
       });
+
+      // ⭐ NEW: Store employees on leave for the modal
+      setEmployeesOnLeave(onLeaveToday);
 
       const workingToday = Math.max(0, allEmployees.length - onLeaveToday.length);
 
@@ -391,7 +693,7 @@ const AdminDashboard = ({ user }) => {
           </div>
         </div>
 
-        {/* Stats Cards */}
+        {/* Stats Cards - UPDATED WITH CLICK HANDLER */}
         <div
           style={{
             display: "grid",
@@ -401,12 +703,20 @@ const AdminDashboard = ({ user }) => {
           }}
         >
           {[
-            { title: "Working Today", value: stats.workingToday, icon: "✅", color: "#10b981" },
-            { title: "On Leave Today", value: stats.onLeaveToday, icon: "🖖", color: "#0dcaf0" },
-            { title: "Pending Approvals", value: stats.pendingLeaves, icon: "⏳", color: "#f59e0b" },
+            { title: "Working Today", value: stats.workingToday, icon: "✅", color: "#10b981", clickable: false },
+            { 
+              title: "On Leave Today", 
+              value: stats.onLeaveToday, 
+              icon: "🖖", 
+              color: "#0dcaf0", 
+              clickable: true,
+              onClick: () => setShowOnLeaveModal(true)
+            },
+            { title: "Pending Approvals", value: stats.pendingLeaves, icon: "⏳", color: "#f59e0b", clickable: false },
           ].map((card) => (
             <div
               key={card.title}
+              onClick={card.clickable ? card.onClick : undefined}
               style={{
                 background: "white",
                 borderRadius: 16,
@@ -415,6 +725,20 @@ const AdminDashboard = ({ user }) => {
                 border: "1px solid #e5e7eb",
                 position: "relative",
                 overflow: "hidden",
+                cursor: card.clickable ? "pointer" : "default",
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                if (card.clickable) {
+                  e.currentTarget.style.transform = "translateY(-4px)";
+                  e.currentTarget.style.boxShadow = "0 8px 32px rgba(0,0,0,0.12)";
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (card.clickable) {
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.boxShadow = "0 4px 20px rgba(0,0,0,0.08)";
+                }
               }}
             >
               <div
@@ -432,6 +756,11 @@ const AdminDashboard = ({ user }) => {
               <div style={{ fontSize: 40, marginBottom: 12 }}>{card.icon}</div>
               <div style={{ fontSize: 14, color: "#6b7280", marginBottom: 4, fontWeight: 500 }}>
                 {card.title}
+                {card.clickable && card.value > 0 && (
+                  <span style={{ fontSize: 12, marginLeft: 8, color: "#3b82f6" }}>
+                    👁️ Click to view
+                  </span>
+                )}
               </div>
               <div style={{ fontSize: 32, fontWeight: 700, color: card.color }}>
                 {card.value}
@@ -740,7 +1069,15 @@ const AdminDashboard = ({ user }) => {
           user={user} 
           onClose={() => setShowHierarchy(false)} 
         />
-      )}  
+      )}
+
+      {/* ⭐ NEW: On Leave Employees Modal */}
+      {showOnLeaveModal && (
+        <OnLeaveEmployeesModal
+          employees={employeesOnLeave}
+          onClose={() => setShowOnLeaveModal(false)}
+        />
+      )}
 
       {/* Rejection Modal */}
       {rejectModal.show && (

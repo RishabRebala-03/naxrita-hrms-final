@@ -22,6 +22,7 @@ CORS(app,
          "origins": [
              "http://localhost:3000",
              "http://127.0.0.1:3000",
+             "https://me.naxrita.com",
              "http://me.naxrita.com"
          ],
          "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],

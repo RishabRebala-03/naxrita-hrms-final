@@ -3,66 +3,12 @@
   <head>
     <meta charset="utf-8" />
     <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#000000" />
     <meta name="description" content="Naxrita Employee Portal" />
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
     <title>Naxrita Portal</title>
-    
-    <!-- ✅ EMERGENCY MOBILE SCROLL FIX - HIGHEST PRIORITY -->
-    <style>
-      /* Force proper scrolling on mobile - Critical Override */
-      @media (max-width: 480px) {
-        html {
-          overflow-x: hidden !important;
-          overflow-y: scroll !important;
-          height: auto !important;
-          min-height: 100vh !important;
-          -webkit-overflow-scrolling: touch !important;
-        }
-        
-        body {
-          overflow-x: hidden !important;
-          overflow-y: scroll !important;
-          height: auto !important;
-          min-height: 100vh !important;
-          position: relative !important;
-          margin: 0 !important;
-        }
-        
-        #root {
-          overflow-x: hidden !important;
-          overflow-y: visible !important;
-          height: auto !important;
-          min-height: 100vh !important;
-        }
-        
-        /* Ensure all children can scroll */
-        #root > * {
-          height: auto !important;
-          min-height: 100vh !important;
-        }
-      }
-      
-      /* Debug mode - uncomment to visualize scroll areas */
-      /*
-      @media (max-width: 480px) {
-        body {
-          outline: 3px solid red !important;
-        }
-        #root {
-          outline: 3px solid blue !important;
-        }
-        .main {
-          outline: 3px solid green !important;
-        }
-        .content {
-          outline: 3px solid purple !important;
-        }
-      }
-      */
-    </style>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>

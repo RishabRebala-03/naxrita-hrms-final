@@ -1,5 +1,5 @@
-// src/components/Notifications.js - WITH EVENT LISTENER FOR REFRESH
-import React, { useState, useEffect } from "react";
+// src/components/Notifications.js - MOBILE VIEWPORT FIX V4
+import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 
 const Notifications = ({ currentUser }) => {
@@ -7,6 +7,10 @@ const Notifications = ({ currentUser }) => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [showDropdown, setShowDropdown] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  
+  const containerRef = useRef(null);
+  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 480;
 
   const fetchNotifications = async () => {
     try {
@@ -27,10 +31,8 @@ const Notifications = ({ currentUser }) => {
   useEffect(() => {
     if (currentUser?.id || currentUser?._id) {
       fetchNotifications();
-      // Poll for new notifications every 30 seconds
       const interval = setInterval(fetchNotifications, 30000);
       
-      // ⭐ NEW: Listen for manual refresh events
       const handleRefresh = () => {
         console.log("🔔 Notification refresh triggered");
         fetchNotifications();
@@ -43,6 +45,35 @@ const Notifications = ({ currentUser }) => {
       };
     }
   }, [currentUser]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    if (!showDropdown) return;
+
+    const handleClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setShowDropdown(false);
+      }
+    };
+
+    // Prevent body scroll when dropdown is open on mobile
+    if (isMobile) {
+      document.body.style.overflow = 'hidden';
+    }
+
+    setTimeout(() => {
+      document.addEventListener('click', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside);
+    }, 0);
+
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+      if (isMobile) {
+        document.body.style.overflow = '';
+      }
+    };
+  }, [showDropdown, isMobile]);
 
   const markAsRead = async (notificationId) => {
     try {
@@ -70,6 +101,25 @@ const Notifications = ({ currentUser }) => {
     }
   };
 
+  const clearAllNotifications = async () => {
+    try {
+      setLoading(true);
+      const userId = currentUser?.id || currentUser?._id;
+      await axios.delete(
+        `${process.env.REACT_APP_BACKEND_URL}/api/notifications/clear_all/${userId}`
+      );
+      setNotifications([]);
+      setUnreadCount(0);
+      setShowClearConfirm(false);
+      fetchNotifications();
+    } catch (err) {
+      console.error("Error clearing all notifications:", err);
+      alert("Failed to clear notifications. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const deleteNotification = async (notificationId) => {
     try {
       await axios.delete(
@@ -91,6 +141,8 @@ const Notifications = ({ currentUser }) => {
         return "📋";
       case "leave_cancelled":
         return "🚫";
+      case "leave_escalated":
+        return "⚠️";
       default:
         return "🔔";
     }
@@ -106,6 +158,8 @@ const Notifications = ({ currentUser }) => {
         return { bg: "#e0f2fe", border: "#7dd3fc" };
       case "leave_cancelled":
         return { bg: "#fef3c7", border: "#fbbf24" };
+      case "leave_escalated":
+        return { bg: "#fee2e2", border: "#fca5a5" };
       default:
         return { bg: "#f3f4f6", border: "#d1d5db" };
     }
@@ -115,7 +169,24 @@ const Notifications = ({ currentUser }) => {
     if (!timestamp) return "";
     
     try {
-      const date = new Date(timestamp);
+      let date;
+      
+      if (typeof timestamp === 'object' && timestamp.$date) {
+        date = new Date(timestamp.$date);
+      } else if (typeof timestamp === 'string') {
+        date = new Date(timestamp);
+      } else if (timestamp instanceof Date) {
+        date = timestamp;
+      } else {
+        console.warn("Unknown timestamp format:", timestamp);
+        return "";
+      }
+
+      if (isNaN(date.getTime())) {
+        console.warn("Invalid date:", timestamp);
+        return "";
+      }
+
       const now = new Date();
       const diffMs = now - date;
       const diffMins = Math.floor(diffMs / 60000);
@@ -131,16 +202,78 @@ const Notifications = ({ currentUser }) => {
         day: "numeric",
         month: "short",
       });
-    } catch {
+    } catch (err) {
+      console.error("Error formatting timestamp:", err, timestamp);
       return "";
     }
   };
 
+  const handleToggleDropdown = (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setShowDropdown(!showDropdown);
+  };
+
+  const handleBackdropClick = (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setShowDropdown(false);
+  };
+
+  // CRITICAL FIX: Calculate proper positioning for mobile
+  const getDropdownStyle = () => {
+    if (!isMobile) {
+      // Desktop - normal absolute positioning
+      return {
+        position: "absolute",
+        top: "calc(100% + 12px)",
+        right: 0,
+        width: 420,
+        maxHeight: 600,
+      };
+    }
+    
+    // Mobile - use fixed positioning relative to button position
+    if (containerRef.current && showDropdown) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const topPosition = rect.bottom + 8; // 8px gap below button
+      const viewportHeight = window.innerHeight;
+      const maxHeight = viewportHeight - topPosition - 20; // 20px bottom padding
+      
+      return {
+        position: "fixed",
+        top: topPosition,
+        right: 12,
+        left: 12,
+        width: "auto",
+        maxHeight: Math.min(maxHeight, viewportHeight * 0.7), // Max 70% of viewport
+      };
+    }
+    
+    // Fallback for mobile
+    return {
+      position: "fixed",
+      top: 72,
+      right: 12,
+      left: 12,
+      width: "auto",
+      maxHeight: "calc(100vh - 90px)",
+    };
+  };
+
   return (
-    <div style={{ position: "relative" }}>
+    <div 
+      ref={containerRef}
+      className="notifications-dropdown-container"
+      style={{ position: "relative" }}
+    >
       {/* Bell Icon Button */}
       <button
-        onClick={() => setShowDropdown(!showDropdown)}
+        onClick={handleToggleDropdown}
+        onTouchEnd={(e) => {
+          e.preventDefault();
+          handleToggleDropdown(e);
+        }}
         style={{
           position: "relative",
           display: "flex",
@@ -195,30 +328,33 @@ const Notifications = ({ currentUser }) => {
         <>
           {/* Backdrop */}
           <div
+            onClick={handleBackdropClick}
+            onTouchEnd={(e) => {
+              e.preventDefault();
+              handleBackdropClick(e);
+            }}
             style={{
               position: "fixed",
               top: 0,
               left: 0,
               right: 0,
               bottom: 0,
-              zIndex: 999,
+              background: "rgba(0, 0, 0, 0.5)",
+              zIndex: 9998,
             }}
-            onClick={() => setShowDropdown(false)}
           />
 
           {/* Notifications Panel */}
           <div
+            className="notifications-dropdown-panel"
+            onClick={(e) => e.stopPropagation()}
             style={{
-              position: "absolute",
-              top: "calc(100% + 12px)",
-              right: 0,
-              width: 420,
-              maxHeight: 600,
+              ...getDropdownStyle(),
               background: "white",
               border: "1px solid #e5e7eb",
               borderRadius: 12,
-              boxShadow: "0 10px 40px rgba(0,0,0,0.15)",
-              zIndex: 1000,
+              boxShadow: "0 20px 60px rgba(0,0,0,0.35)",
+              zIndex: 9999,
               overflow: "hidden",
               display: "flex",
               flexDirection: "column",
@@ -230,36 +366,72 @@ const Notifications = ({ currentUser }) => {
                 padding: "16px 20px",
                 borderBottom: "1px solid #e5e7eb",
                 background: "#f9fafb",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
+                flexShrink: 0,
               }}
             >
-              <div>
-                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>
-                  Notifications
-                </h3>
+              <div style={{ 
+                display: "flex", 
+                justifyContent: "space-between", 
+                alignItems: "center",
+                marginBottom: 8
+              }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>
+                    Notifications
+                  </h3>
+                  {unreadCount > 0 && (
+                    <p style={{ margin: 0, fontSize: 12, color: "#6b7280", marginTop: 2 }}>
+                      {unreadCount} unread
+                    </p>
+                  )}
+                </div>
                 {unreadCount > 0 && (
-                  <p style={{ margin: 0, fontSize: 12, color: "#6b7280", marginTop: 2 }}>
-                    {unreadCount} unread
-                  </p>
+                  <button
+                    onClick={markAllAsRead}
+                    disabled={loading}
+                    style={{
+                      background: "transparent",
+                      border: "none",
+                      color: "#667eea",
+                      fontSize: 13,
+                      fontWeight: 500,
+                      cursor: "pointer",
+                      padding: "4px 8px",
+                    }}
+                  >
+                    {loading ? "..." : "Mark all read"}
+                  </button>
                 )}
               </div>
-              {unreadCount > 0 && (
+
+              {/* Clear All Button */}
+              {notifications.length > 0 && (
                 <button
-                  onClick={markAllAsRead}
+                  onClick={() => setShowClearConfirm(true)}
                   disabled={loading}
                   style={{
-                    background: "transparent",
-                    border: "none",
-                    color: "#667eea",
+                    width: "100%",
+                    marginTop: 8,
+                    padding: "8px 12px",
+                    background: "white",
+                    border: "1px solid #e5e7eb",
+                    borderRadius: 6,
+                    color: "#dc2626",
                     fontSize: 13,
                     fontWeight: 500,
                     cursor: "pointer",
-                    padding: "4px 8px",
+                    transition: "all 0.2s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "#fef2f2";
+                    e.currentTarget.style.borderColor = "#fca5a5";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "white";
+                    e.currentTarget.style.borderColor = "#e5e7eb";
                   }}
                 >
-                  {loading ? "..." : "Mark all read"}
+                  🗑️ Clear All Notifications
                 </button>
               )}
             </div>
@@ -269,7 +441,7 @@ const Notifications = ({ currentUser }) => {
               style={{
                 flex: 1,
                 overflowY: "auto",
-                maxHeight: 500,
+                WebkitOverflowScrolling: "touch",
               }}
             >
               {notifications.length === 0 ? (
@@ -290,12 +462,13 @@ const Notifications = ({ currentUser }) => {
                     <div
                       key={notif._id}
                       style={{
-                        padding: 16,
+                        padding: isMobile ? 16 : 14,
                         borderBottom: "1px solid #f3f4f6",
                         background: notif.read ? "white" : "#fefce8",
                         cursor: "pointer",
                         transition: "background 0.2s",
                         position: "relative",
+                        minHeight: isMobile ? 60 : "auto",
                       }}
                       onMouseEnter={(e) => {
                         if (notif.read) e.currentTarget.style.background = "#f9fafb";
@@ -379,6 +552,8 @@ const Notifications = ({ currentUser }) => {
                             padding: 4,
                             lineHeight: 1,
                             flexShrink: 0,
+                            minWidth: 28,
+                            minHeight: 28,
                           }}
                           onMouseEnter={(e) => (e.currentTarget.style.color = "#ef4444")}
                           onMouseLeave={(e) => (e.currentTarget.style.color = "#9ca3af")}
@@ -393,6 +568,99 @@ const Notifications = ({ currentUser }) => {
             </div>
           </div>
         </>
+      )}
+
+      {/* Clear All Confirmation Modal */}
+      {showClearConfirm && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0,0,0,0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 10000,
+          }}
+          onClick={() => setShowClearConfirm(false)}
+        >
+          <div
+            style={{
+              background: "white",
+              padding: 28,
+              borderRadius: 12,
+              maxWidth: 400,
+              width: "90%",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ fontSize: 40, textAlign: "center", marginBottom: 16 }}>
+              🗑️
+            </div>
+            <h3 style={{ 
+              margin: 0, 
+              marginBottom: 12, 
+              fontSize: 20, 
+              fontWeight: 600,
+              textAlign: "center" 
+            }}>
+              Clear All Notifications?
+            </h3>
+            <p style={{ 
+              margin: 0, 
+              marginBottom: 24, 
+              color: "#6b7280", 
+              fontSize: 14,
+              textAlign: "center",
+              lineHeight: 1.5
+            }}>
+              This will permanently delete all {notifications.length} notification{notifications.length !== 1 ? 's' : ''}. 
+              This action cannot be undone.
+            </p>
+            
+            <div style={{ display: "flex", gap: 12 }}>
+              <button
+                onClick={() => setShowClearConfirm(false)}
+                disabled={loading}
+                style={{
+                  flex: 1,
+                  padding: "10px 20px",
+                  background: "#f3f4f6",
+                  color: "#374151",
+                  border: "none",
+                  borderRadius: 8,
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={clearAllNotifications}
+                disabled={loading}
+                style={{
+                  flex: 1,
+                  padding: "10px 20px",
+                  background: "#ef4444",
+                  color: "white",
+                  border: "none",
+                  borderRadius: 8,
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: loading ? "not-allowed" : "pointer",
+                  opacity: loading ? 0.6 : 1,
+                }}
+              >
+                {loading ? "Clearing..." : "Clear All"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
