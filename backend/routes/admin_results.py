@@ -84,6 +84,12 @@ def get_test_user_results(exam_id: str):
         user = db.users.find_one({"userId": result.get("userId")})
         user_name = user.get("name", result.get("userId")) if user else result.get("userId")
         
+        # Format submittedAt with explicit UTC 'Z' suffix
+        submitted_at = None
+        if result.get("submittedAt"):
+            # Ensure the datetime is treated as UTC and formatted with 'Z'
+            submitted_at = result.get("submittedAt").isoformat() + 'Z' if not result.get("submittedAt").isoformat().endswith('Z') else result.get("submittedAt").isoformat()
+        
         user_results.append({
             "id": str(result["_id"]),
             "userId": result.get("userId"),
@@ -92,7 +98,7 @@ def get_test_user_results(exam_id: str):
             "scoredMarks": int(result.get("scoredMarks", 0)),
             "totalMarks": int(result.get("totalMarks", 0)),
             "passed": bool(result.get("passed", False)),
-            "submittedAt": result.get("submittedAt").isoformat() if result.get("submittedAt") else None,
+            "submittedAt": submitted_at,
             "timeSpentSec": int(result.get("timeSpentSec", 0)),
             "percentile": percentile_map.get(str(result["_id"]), 0),
         })
@@ -128,6 +134,12 @@ def get_detailed_result(result_id: str):
             percentile = int((idx / len(sorted_results)) * 100) if len(sorted_results) > 0 else 0
             break
     
+    # Format submittedAt with explicit UTC 'Z' suffix
+    submitted_at = None
+    if result.get("submittedAt"):
+        # Ensure the datetime is treated as UTC and formatted with 'Z'
+        submitted_at = result.get("submittedAt").isoformat() + 'Z' if not result.get("submittedAt").isoformat().endswith('Z') else result.get("submittedAt").isoformat()
+    
     detailed = {
         "id": str(result["_id"]),
         "attemptId": str(result.get("attemptId", result["_id"])),
@@ -138,7 +150,7 @@ def get_detailed_result(result_id: str):
         "percentage": float(result.get("percentage", 0)),
         "passed": bool(result.get("passed", False)),
         "percentile": percentile,
-        "submittedAt": result.get("submittedAt").isoformat() if result.get("submittedAt") else None,
+        "submittedAt": submitted_at,
         "timeSpentSec": int(result.get("timeSpentSec", 0)),
         "sectionWise": result.get("sectionWise", {}),
         "questionReview": result.get("questionReview", []),

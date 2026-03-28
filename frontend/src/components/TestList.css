@@ -219,6 +219,40 @@
   margin: 0;
 }
 
+/* Scrollable user list inside Assign modal */
+.assign-user-list {
+  max-height: 360px;          /* 👈 key line */
+  overflow-y: auto;
+  padding-right: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+/* Individual user row */
+.assign-user-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+/* Make scrollbar clean (Chrome / Edge) */
+.assign-user-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.assign-user-list::-webkit-scrollbar-thumb {
+  background: #c7d2fe;
+  border-radius: 6px;
+}
+
+.assign-user-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+
 .close-btn {
   background: transparent;
   border: none;

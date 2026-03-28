@@ -498,6 +498,34 @@
   gap: 0;
 }
 
+.test-action-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.attempted-hint {
+  font-size: 0.85rem;
+  color: #6b7280;
+  text-align: center;
+  max-width: 220px;
+  line-height: 1.4;
+}
+
+.test-action-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.primary-btn.large:disabled {
+  background: #e5e7eb;
+  color: #9ca3af;
+}
+
+
 .test-meta-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

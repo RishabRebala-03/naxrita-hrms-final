@@ -5,6 +5,8 @@
   min-height: 100vh;
   background: #f5f6f7;
   font-family: '72', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  /* Clip anything that tries to overflow the viewport width */
+  overflow: hidden;
 }
 
 .admin-sidebar {
@@ -17,20 +19,20 @@
   height: 100vh;
   left: 0;
   top: 0;
+  /* Sidebar must sit above the main content */
+  z-index: 100;
 }
 
 .sidebar-header {
   padding: 1.5rem;
   border-bottom: 0.0625rem solid #d9d9d9;
 }
-
 .sidebar-header h1 {
   font-size: 1.25rem;
   font-weight: 400;
   color: #1d2d3e;
   margin-bottom: 0.5rem;
 }
-
 .admin-badge {
   display: inline-block;
   padding: 0.25rem 0.75rem;
@@ -45,7 +47,6 @@
   flex: 1;
   padding: 1rem 0;
 }
-
 .nav-item {
   width: 100%;
   padding: 0.875rem 1.5rem;
@@ -62,26 +63,18 @@
   gap: 0.75rem;
   font-family: inherit;
 }
-
-.nav-item:hover {
-  background: #f7f9fb;
-}
-
+.nav-item:hover { background: #f7f9fb; }
 .nav-item.active {
   background: #ebf5ff;
   border-left-color: #0070f2;
   color: #0070f2;
 }
-
-.nav-icon {
-  font-size: 1.125rem;
-}
+.nav-icon { font-size: 1.125rem; }
 
 .sidebar-footer {
   padding: 1rem;
   border-top: 0.0625rem solid #d9d9d9;
 }
-
 .sidebar-logo {
   height: 56px;
   max-width: 120px;
@@ -89,7 +82,6 @@
   display: block;
   margin-bottom: 0.75rem;
 }
-
 .user-profile {
   display: flex;
   align-items: center;
@@ -97,7 +89,6 @@
   padding: 0.75rem;
   margin-bottom: 0.5rem;
 }
-
 .user-avatar {
   width: 2rem;
   height: 2rem;
@@ -110,11 +101,7 @@
   font-size: 0.875rem;
   font-weight: 500;
 }
-
-.user-name {
-  font-size: 0.875rem;
-  color: #1d2d3e;
-}
+.user-name { font-size: 0.875rem; color: #1d2d3e; }
 
 .logout-btn {
   width: 100%;
@@ -128,18 +115,48 @@
   transition: all 0.2s ease;
   font-family: inherit;
 }
+.logout-btn:hover { background: #d32f2f; color: #ffffff; }
 
-.logout-btn:hover {
-  background: #d32f2f;
-  color: #ffffff;
-}
+/* ═══════════════════════════════════════════════════════════
+   THE FIX — two new properties on .admin-main
 
+   WHY IT WAS BLEEDING:
+   .admin-sidebar is position:fixed, so it's taken out of
+   normal flow. .admin-main uses margin-left:16rem to step
+   past it, but as a flex child with no width cap it can
+   still grow to match its content width — which means a
+   wide table bleeds under the fixed sidebar on the left.
+
+   THE SOLUTION:
+   1. min-width: 0
+      Overrides the flex default (min-width: auto) that lets
+      flex children grow past their container. This is the
+      single most important rule.
+
+   2. overflow-x: hidden
+      Secondary clip. Catches anything that still escapes
+      after min-width:0. Safe here because .admin-main is
+      NOT the scroll container — .users-table handles its
+      own horizontal scroll inside it.
+
+   3. width: calc(100vw - 16rem)
+      Gives .admin-main an explicit maximum width equal to
+      the viewport minus the sidebar, so it can never grow
+      past the available space regardless of content width.
+   ═══════════════════════════════════════════════════════════ */
 .admin-main {
   margin-left: 16rem;
   flex: 1;
   padding: 2rem;
-  animation: fadeIn 0.3s ease;
   padding-top: 0;
+  animation: fadeIn 0.3s ease;
+
+  /* ↓ THE FIX ↓ */
+  min-width: 0;                        /* stop flex child from overflowing */
+  overflow-x: hidden;                  /* secondary clip                   */
+  width: calc(100vw - 16rem);          /* hard cap at viewport minus sidebar */
+  max-width: calc(100vw - 16rem);
+  box-sizing: border-box;
 }
 
 .dashboard-topbar {
@@ -150,14 +167,8 @@
 }
 
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(0.5rem);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(0.5rem); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .dashboard-home h2 {
@@ -172,23 +183,20 @@
   grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
   gap: 1.5rem;
 }
-
 .stat-card {
   background: #ffffff;
   border-radius: 0.5rem;
   padding: 1.5rem;
-  box-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.05);
+  box-shadow: 0 0.125rem 0.5rem rgba(0,0,0,0.05);
   display: flex;
   align-items: center;
   gap: 1rem;
   transition: transform 0.2s ease;
 }
-
 .stat-card:hover {
   transform: translateY(-0.25rem);
-  box-shadow: 0 0.25rem 1rem rgba(0, 0, 0, 0.1);
+  box-shadow: 0 0.25rem 1rem rgba(0,0,0,0.1);
 }
-
 .stat-icon {
   font-size: 2rem;
   width: 3rem;
@@ -199,18 +207,23 @@
   background: #ebf5ff;
   border-radius: 0.5rem;
 }
-
 .stat-info h3 {
   font-size: 0.875rem;
   font-weight: 400;
   color: #6a6d70;
   margin-bottom: 0.25rem;
 }
-
 .stat-number {
   font-size: 1.75rem;
   font-weight: 300;
   color: #1d2d3e;
+}
+
+.subtitle {
+  color: #6a6d70;
+  font-size: 0.9375rem;
+  margin-top: -1.5rem;
+  margin-bottom: 2rem;
 }
 
 @media (max-width: 768px) {
@@ -218,13 +231,12 @@
     width: 100%;
     position: relative;
     height: auto;
+    z-index: auto;
   }
-
   .admin-main {
     margin-left: 0;
+    width: 100%;
+    max-width: 100%;
   }
-
-  .stats-grid {
-    grid-template-columns: 1fr;
-  }
+  .stats-grid { grid-template-columns: 1fr; }
 }

@@ -73,6 +73,7 @@ const TestInterface: React.FC<TestInterfaceProps> = ({
   const sections = Array.from(new Set(questions.map((q) => q.section)));
 
   const currentQuestion = questions[currentQuestionIndex];
+  const isLastQuestion = currentQuestionIndex === questions.length - 1;
 
   // attempt id from backend
   const [attemptId, setAttemptId] = useState<string | null>(null);
@@ -152,6 +153,15 @@ const TestInterface: React.FC<TestInterfaceProps> = ({
     if (a.marked) return "marked";
     const hasAnswer = Array.isArray(a.answer) ? a.answer.length > 0 : a.answer !== "";
     return hasAnswer ? "answered" : "unanswered";
+  };
+
+  const areAllQuestionsAnswered = () => {
+    return answers.every((a) => {
+      if (Array.isArray(a.answer)) {
+        return a.answer.length > 0;
+      }
+      return a.answer !== "";
+    });
   };
 
   // Create attempt when user enters EXAM step
@@ -340,17 +350,35 @@ const TestInterface: React.FC<TestInterfaceProps> = ({
             {answers[currentQuestionIndex].marked ? "Unmark Review" : "Mark for Review"}
           </button>
 
-          <button
-            className="nav-btn primary"
-            onClick={handleNext}
-            disabled={currentQuestionIndex === questions.length - 1}
-          >
-            Next Question &gt;
-          </button>
+          {!isLastQuestion && (
+            <button
+              className="nav-btn primary"
+              onClick={handleNext}
+            >
+              Next Question &gt;
+            </button>
+          )}
 
-          <button className="nav-btn submit-btn" onClick={handleSubmit}>
-            Submit
-          </button>
+          {isLastQuestion && !areAllQuestionsAnswered() && (
+            <div style={{ color: "#d32f2f", marginTop: "8px", fontSize: "0.9rem" }}>
+              ⚠️ Please answer all questions before submitting the test.
+            </div>
+          )}
+
+          {isLastQuestion && (
+            <button
+              className="nav-btn submit-btn"
+              onClick={handleSubmit}
+              disabled={!areAllQuestionsAnswered()}
+              title={
+                areAllQuestionsAnswered()
+                  ? "Submit test"
+                  : "Please answer all questions before submitting"
+              }
+            >
+              Submit Test
+            </button>
+          )}
         </div>
       </div>
     </div>

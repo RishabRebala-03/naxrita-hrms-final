@@ -315,3 +315,8 @@
 .icon-btn.danger {
   color: #d32f2f;
 }
+
+.prewrap {
+  white-space: pre-wrap;
+  font-family: inherit;
+}

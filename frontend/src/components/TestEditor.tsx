@@ -12,6 +12,11 @@ interface Question {
   marks: number;
 }
 
+interface Section {
+  id: string;
+  name: string;
+}
+
 interface TestEditorProps {
   testId: string;
   onBack: () => void;
@@ -21,18 +26,21 @@ const TestEditor: React.FC<TestEditorProps> = ({ testId, onBack }) => {
   const [loading, setLoading] = useState(true);
   const [testName, setTestName] = useState('');
   const [duration, setDuration] = useState(60);
-  const [sections, setSections] = useState<string[]>(['General']);
+  const [sections, setSections] = useState<Section[]>([
+    { id: 'general', name: 'General' }
+  ]);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [showQuestionForm, setShowQuestionForm] = useState(false);
   const [newSection, setNewSection] = useState('');
+  const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
 
   const [questionForm, setQuestionForm] = useState({
     type: 'mcq' as 'mcq' | 'multiple' | 'text',
     question: '',
-    options: ['', '', '', ''],
+    options: ['', ''],  // Start with 2 empty options
     correctAnswer: '',
     correctAnswers: [] as string[],
-    section: 'General',
+    section: sections[0]?.id || '',
     marks: 1,
   });
 
@@ -48,32 +56,45 @@ const TestEditor: React.FC<TestEditorProps> = ({ testId, onBack }) => {
       
       setTestName(test.testName || test.name || '');
       setDuration(test.duration || 60);
+      
+      // Convert sections from backend format to {id, name} format
       const normalizedSections = (test.sections || ['General'])
         .map((s: any) => typeof s === 'string' ? s : s.name)
         .map((s: string) => s?.trim())
         .filter((s: string) => s);
 
-      setSections(normalizedSections);
+      const sectionObjects = normalizedSections.map((name: string, index: number) => ({
+        id: `section-${index}`,
+        name: name
+      }));
 
+      setSections(sectionObjects);
       
       // Convert questions from backend format
-      const loadedQuestions: Question[] = (test.questions || []).map((q: any) => ({
-        id: q.id || q._id,
-        type: q.type,
-        question: q.question,
-        options: q.options || [],
-        correctAnswer: q.correctAnswer,
-        section: q.section?.trim() || 'General',
-        marks: q.marks || 1,
-      }));
+      const loadedQuestions: Question[] = (test.questions || []).map((q: any) => {
+        // Find matching section ID
+        const sectionName = q.section?.trim() || 'General';
+        const sectionObj = sectionObjects.find((s: Section) => s.name === sectionName);
+        const sectionId = sectionObj ? sectionObj.id : sectionObjects[0]?.id || 'general';
+
+        return {
+          id: q.id || q._id,
+          type: q.type,
+          question: q.question,
+          options: q.options || [],
+          correctAnswer: q.correctAnswer,
+          section: sectionId, // Use section ID instead of name
+          marks: q.marks || 1,
+        };
+      });
       
       console.log('Loaded questions:', loadedQuestions);
-      console.log('Sections:', normalizedSections);
+      console.log('Sections:', sectionObjects);
       
       setQuestions(loadedQuestions);
       
-      if (loadedQuestions.length > 0) {
-        setQuestionForm(prev => ({ ...prev, section: loadedQuestions[0].section }));
+      if (sectionObjects.length > 0) {
+        setQuestionForm(prev => ({ ...prev, section: sectionObjects[0].id }));
       }
     } catch (err) {
       console.error(err);
@@ -85,13 +106,66 @@ const TestEditor: React.FC<TestEditorProps> = ({ testId, onBack }) => {
   };
 
   const addSection = () => {
-    if (newSection.trim() && !sections.includes(newSection.trim())) {
-      setSections([...sections, newSection.trim()]);
-      setNewSection('');
+    const name = newSection.trim();
+    if (!name) return;
+
+    const exists = sections.some(
+      (s) => s.name.toLowerCase() === name.toLowerCase()
+    );
+
+    if (exists) return;
+
+    setSections([
+      ...sections,
+      {
+        id: Date.now().toString(),
+        name,
+      },
+    ]);
+
+    setNewSection('');
+  };
+
+  // Add option to the question form
+  const addOption = () => {
+    setQuestionForm({ 
+      ...questionForm, 
+      options: [...questionForm.options, ''] 
+    });
+  };
+
+  // Remove option from the question form
+  const removeOption = (index: number) => {
+    const newOptions = questionForm.options.filter((_, i) => i !== index);
+    // Also remove from correct answers if it was selected
+    const removedOption = questionForm.options[index];
+    let newCorrectAnswers = questionForm.correctAnswers;
+    if (questionForm.correctAnswers.includes(removedOption)) {
+      newCorrectAnswers = questionForm.correctAnswers.filter(a => a !== removedOption);
     }
+    let newCorrectAnswer = questionForm.correctAnswer;
+    if (questionForm.correctAnswer === removedOption) {
+      newCorrectAnswer = '';
+    }
+    
+    setQuestionForm({ 
+      ...questionForm, 
+      options: newOptions,
+      correctAnswers: newCorrectAnswers,
+      correctAnswer: newCorrectAnswer,
+    });
   };
 
   const addQuestion = () => {
+    // Validate that we have at least 2 options for MCQ/multiple questions
+    if (questionForm.type === 'mcq' || questionForm.type === 'multiple') {
+      const validOptions = questionForm.options.filter(opt => opt.trim());
+      if (validOptions.length < 2) {
+        alert('Please add at least 2 options');
+        return;
+      }
+    }
+
     const newQuestion: Question = {
       id: Date.now().toString(),
       type: questionForm.type,
@@ -116,10 +190,10 @@ const TestEditor: React.FC<TestEditorProps> = ({ testId, onBack }) => {
     setQuestionForm({
       type: 'mcq',
       question: '',
-      options: ['', '', '', ''],
+      options: ['', ''],  // Reset to 2 empty options
       correctAnswer: '',
       correctAnswers: [],
-      section: sections[0] || 'General',
+      section: sections[0]?.id || '',
       marks: 1,
     });
     setShowQuestionForm(false);
@@ -150,10 +224,8 @@ const TestEditor: React.FC<TestEditorProps> = ({ testId, onBack }) => {
     }
   };
 
-  const getQuestionsBySection = (section: string) => {
-    return questions.filter(q => 
-      q.section?.trim().toLowerCase() === section?.trim().toLowerCase()
-    );
+  const getQuestionsBySection = (sectionId: string) => {
+    return questions.filter(q => q.section === sectionId);
   };
 
   const handleUpdateTest = async () => {
@@ -168,11 +240,23 @@ const TestEditor: React.FC<TestEditorProps> = ({ testId, onBack }) => {
     }
 
     try {
+      // Convert sections from {id, name} objects to just names (strings)
+      const sectionNames = sections.map(s => s.name);
+      
+      // Convert questions section IDs to section names
+      const questionsWithSectionNames = questions.map(q => {
+        const sectionObj = sections.find(s => s.id === q.section);
+        return {
+          ...q,
+          section: sectionObj ? sectionObj.name : q.section
+        };
+      });
+
       await apiPut(`/admin/exams/${testId}`, {
         testName,
         duration,
-        sections,
-        questions,
+        sections: sectionNames,
+        questions: questionsWithSectionNames,
       });
 
       alert("Test updated successfully");
@@ -185,14 +269,16 @@ const TestEditor: React.FC<TestEditorProps> = ({ testId, onBack }) => {
 
   if (loading) {
     return (
-      <div className="test-builder" style={{ paddingTop: '2rem' }}>
-        <p>Loading test...</p>
+      <div className="test-builder page-with-topbar">
+        <div style={{ padding: '2rem' }}>
+          <p>Loading test...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="test-builder" style={{ paddingTop: '2rem' }}>
+    <div className="test-builder page-with-topbar">
       <div className="page-header">
         <h2>Edit Test</h2>
         <button className="secondary-btn" onClick={onBack}>
@@ -227,9 +313,63 @@ const TestEditor: React.FC<TestEditorProps> = ({ testId, onBack }) => {
           <h4>Sections</h4>
           <div className="section-tags">
             {sections.map((section) => (
-              <span key={section} className="section-tag">
-                {section}
-              </span>
+              <div key={section.id} className="section-chip">
+                {editingSectionId === section.id ? (
+                  <input
+                    className="section-edit-input"
+                    value={section.name}
+                    autoFocus
+                    onChange={(e) => {
+                      const newName = e.target.value;
+                      setSections(sections.map(s =>
+                        s.id === section.id ? { ...s, name: newName } : s
+                      ));
+                    }}
+                    onBlur={() => setEditingSectionId(null)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        setEditingSectionId(null);
+                      }
+                    }}
+                  />
+                ) : (
+                  <span className="section-name">{section.name}</span>
+                )}
+
+                <div className="section-actions">
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    title="Edit section"
+                    onClick={() => setEditingSectionId(section.id)}
+                  >
+                    ✏️
+                  </button>
+
+                  <button
+                    type="button"
+                    className="icon-btn danger"
+                    title="Delete section"
+                    onClick={() => {
+                      const remainingSections = sections.filter(s => s.id !== section.id);
+
+                      setSections(remainingSections);
+                      setQuestions(questions.filter(q => q.section !== section.id));
+
+                      // Reset selected section if needed
+                      setQuestionForm((prev) => ({
+                        ...prev,
+                        section:
+                          prev.section === section.id
+                            ? remainingSections[0]?.id || ''
+                            : prev.section,
+                      }));
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
             ))}
           </div>
           <div className="add-section">
@@ -282,8 +422,8 @@ const TestEditor: React.FC<TestEditorProps> = ({ testId, onBack }) => {
                   }
                 >
                   {sections.map((section) => (
-                    <option key={section} value={section}>
-                      {section}
+                    <option key={section.id} value={section.id}>
+                      {section.name}
                     </option>
                   ))}
                 </select>
@@ -315,7 +455,17 @@ const TestEditor: React.FC<TestEditorProps> = ({ testId, onBack }) => {
 
             {(questionForm.type === 'mcq' || questionForm.type === 'multiple') && (
               <div className="options-section">
-                <label>Options *</label>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                  <label>Options * (minimum 2)</label>
+                  <button 
+                    type="button"
+                    className="primary-btn" 
+                    onClick={addOption}
+                    style={{ fontSize: '0.85rem', padding: '0.4rem 0.8rem' }}
+                  >
+                    + Add Option
+                  </button>
+                </div>
                 {questionForm.options.map((option, index) => (
                   <div key={index} className="option-input">
                     <input
@@ -341,6 +491,17 @@ const TestEditor: React.FC<TestEditorProps> = ({ testId, onBack }) => {
                       />
                     )}
                     <span className="option-label">Correct</span>
+                    {questionForm.options.length > 2 && (
+                      <button
+                        type="button"
+                        className="icon-btn danger"
+                        onClick={() => removeOption(index)}
+                        title="Remove option"
+                        style={{ marginLeft: '0.5rem' }}
+                      >
+                        ✕
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -369,16 +530,12 @@ const TestEditor: React.FC<TestEditorProps> = ({ testId, onBack }) => {
         )}
 
         {sections.map((section) => {
-          const sectionQuestions = getQuestionsBySection(section);
-          
-          // Debug logging
-          console.log(`Section: ${section}, Questions:`, sectionQuestions);
-          
+          const sectionQuestions = getQuestionsBySection(section.id);
           if (sectionQuestions.length === 0) return null;
 
           return (
-            <div key={section} className="section-block">
-              <h4>{section} ({sectionQuestions.length} questions)</h4>
+            <div key={section.id} className="section-block">
+              <h4>{section.name} ({sectionQuestions.length} questions)</h4>
               <div className="questions-list">
                 {sectionQuestions.map((q, index) => (
                   <div key={q.id} className="question-card">
@@ -393,7 +550,7 @@ const TestEditor: React.FC<TestEditorProps> = ({ testId, onBack }) => {
                         ✕
                       </button>
                     </div>
-                    <p className="question-text">{q.question}</p>
+                    <p className="question-text prewrap">{q.question}</p>
                     {q.options && (
                       <ul className="options-list">
                         {q.options.map((opt, i) => (

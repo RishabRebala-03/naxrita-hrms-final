@@ -12,7 +12,7 @@ def _normalize_answer(ans):
 def compute_result(
     questions: List[Dict[str, Any]],
     answers: List[Dict[str, Any]],
-    passing_percent: float = 40.0,
+    passing_percent: float = 80.0,
 ) -> Dict[str, Any]:
     """Compute score + section breakdown + per-question review.
 

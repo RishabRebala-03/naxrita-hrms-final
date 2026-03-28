@@ -119,6 +119,12 @@ def list_assigned_tests():
                 question_types.add("Text")
         
         question_types_str = ", ".join(sorted(question_types)) if question_types else "Mixed"
+
+        has_attempted = db.attempts.find_one({
+            "examId": e["_id"],
+            "userId": userId,
+            "status": "submitted"
+        }) is not None
         
         out.append({
             "id": str(e["_id"]),
@@ -128,8 +134,9 @@ def list_assigned_tests():
             "sections": e.get("sections", []),
             "status": e.get("status", "draft"),
             "totalMarks": total_marks,
-            "passingPercentage": 40,
+            "passingPercentage": 80,
             "questionTypes": question_types_str,
+            "attempted": has_attempted,
         })
 
     return jsonify({"tests": to_jsonable(out)})
@@ -196,7 +203,7 @@ def get_test_for_taker(exam_id: str):
             "sections": exam.get("sections", []),
             "questions": out_questions,
             "totalMarks": total_marks,
-            "passingPercentage": 40,
+            "passingPercentage": 80,
             "questionTypes": question_types_str,
         })
     })
@@ -225,8 +232,21 @@ def start_attempt():
     if not db.exam_assignments.find_one({"examId": exam_oid, "userId": userId}):
         return jsonify({"error": "Exam not assigned"}), 403
 
-    # If there's an in-progress attempt, return it
-    existing = db.attempts.find_one({"examId": exam_oid, "userId": userId, "status": "in_progress"})
+    # ❌ Block if already submitted
+    submitted = db.attempts.find_one({
+        "examId": exam_oid,
+        "userId": userId,
+        "status": "submitted"
+    })
+    if submitted:
+        return jsonify({"error": "Test already attempted"}), 409
+
+    # Resume in-progress attempt if exists
+    existing = db.attempts.find_one({
+        "examId": exam_oid,
+        "userId": userId,
+        "status": "in_progress"
+    })
     if existing:
         return jsonify({"attemptId": str(existing["_id"])})
 
@@ -290,6 +310,10 @@ def submit_attempt(attempt_id):
     attempt = db.attempts.find_one({"_id": ObjectId(attempt_id)})
     if not attempt:
         return jsonify({"error": "Attempt not found"}), 404
+
+    # ✅ ADD THIS BLOCK
+    if attempt.get("status") == "submitted":
+        return jsonify({"error": "Attempt already submitted"}), 409
 
     exam_id = attempt["examId"]
 
@@ -359,7 +383,7 @@ def submit_attempt(attempt_id):
         "totalMarks": total_marks,
         "scoredMarks": scored_marks,
         "percentage": percentage,
-        "passed": percentage >= 40,
+        "passed": percentage >= 80,
         "percentile": 0,
         "sectionWise": section_wise,
         "questionReview": question_review,

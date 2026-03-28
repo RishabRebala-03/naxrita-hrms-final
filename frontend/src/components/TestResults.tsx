@@ -22,7 +22,6 @@ interface UserResult {
   passed: boolean;
   submittedAt: string;
   timeSpentSec: number;
-  percentile: number;
 }
 
 interface QuestionReview {
@@ -43,7 +42,6 @@ interface DetailedResult {
   scoredMarks: number;
   percentage: number;
   passed: boolean;
-  percentile: number;
   submittedAt: string;
   timeSpentSec: number;
   sectionWise: Record<string, { total: number; scored: number }>;
@@ -75,6 +73,8 @@ const TestResults: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'passed' | 'failed'>('all');
   const [sortBy, setSortBy] = useState<'score-high' | 'score-low' | 'name' | 'date'>('score-high');
+  const [minPercent, setMinPercent] = useState<number>(0);
+  const [maxPercent, setMaxPercent] = useState<number>(100);
 
   useEffect(() => {
     loadTests();
@@ -82,7 +82,7 @@ const TestResults: React.FC = () => {
 
   useEffect(() => {
     applyFiltersAndSort();
-  }, [userResults, searchQuery, filterStatus, sortBy]);
+  }, [userResults, searchQuery, filterStatus, sortBy, minPercent, maxPercent]);
 
   const loadTests = async () => {
     try {
@@ -115,7 +115,6 @@ const TestResults: React.FC = () => {
         passed: r.passed,
         submittedAt: r.submittedAt,
         timeSpentSec: r.timeSpentSec,
-        percentile: r.percentile || 0,
       }));
       setUserResults(results);
     } catch (e) {
@@ -142,7 +141,6 @@ const TestResults: React.FC = () => {
         scoredMarks: result.scoredMarks,
         percentage: result.percentage,
         passed: result.passed,
-        percentile: result.percentile || 0,
         submittedAt: result.submittedAt,
         timeSpentSec: result.timeSpentSec || 0,
         sectionWise: result.sectionWise || {},
@@ -166,6 +164,8 @@ const TestResults: React.FC = () => {
       );
     }
 
+
+    filtered = filtered.filter((r) => r.percentage >= minPercent && r.percentage <= maxPercent);
     // Status filter
     if (filterStatus === 'passed') {
       filtered = filtered.filter((r) => r.passed);
@@ -213,6 +213,65 @@ const TestResults: React.FC = () => {
     setSortBy('score-high');
   };
 
+  const exportToCSV = () => {
+    if (!selectedTest || filteredResults.length === 0) return;
+
+    const headers = ['Rank', 'Name', 'User ID', 'Score', 'Total Marks', 'Percentage', 'Status', 'Time Spent', 'Submitted At'];
+    const rows = filteredResults.map((r, idx) => [
+      idx + 1,
+      r.userName,
+      r.userId,
+      r.scoredMarks,
+      r.totalMarks,
+      r.percentage.toFixed(2) + '%',
+      r.passed ? 'Passed' : 'Failed',
+      formatTime(r.timeSpentSec),
+      formatDate(r.submittedAt),
+    ]);
+
+    const csvContent = [headers, ...rows]
+      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${selectedTest.name.replace(/\s+/g, '_')}_results.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportAllToCSV = () => {
+    if (!selectedTest || userResults.length === 0) return;
+
+    const headers = ['Rank', 'Name', 'User ID', 'Score', 'Total Marks', 'Percentage', 'Status', 'Time Spent', 'Submitted At'];
+    const sorted = [...userResults].sort((a, b) => b.percentage - a.percentage);
+    const rows = sorted.map((r, idx) => [
+      idx + 1,
+      r.userName,
+      r.userId,
+      r.scoredMarks,
+      r.totalMarks,
+      r.percentage.toFixed(2) + '%',
+      r.passed ? 'Passed' : 'Failed',
+      formatTime(r.timeSpentSec),
+      formatDate(r.submittedAt),
+    ]);
+
+    const csvContent = [headers, ...rows]
+      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${selectedTest.name.replace(/\s+/g, '_')}_ALL_results.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   const handleBackToUsers = () => {
     setView('users');
     setSelectedUser(null);
@@ -227,14 +286,45 @@ const TestResults: React.FC = () => {
     return `${hrs}h ${mins}m ${secs}s`;
   };
 
+  /**
+   * Format date to IST timezone
+   * Converts UTC date string to IST (UTC+5:30) and formats it
+   */
   const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    if (!dateStr) return 'N/A';
+    
+    try {
+      // Ensure the date string is properly parsed as UTC
+      let date: Date;
+      
+      // If the date string doesn't end with 'Z', it might not be treated as UTC
+      if (dateStr.endsWith('Z')) {
+        date = new Date(dateStr);
+      } else {
+        // Assume it's UTC and add Z
+        date = new Date(dateStr + (dateStr.includes('T') ? 'Z' : 'T00:00:00Z'));
+      }
+      
+      // Verify the date is valid
+      if (isNaN(date.getTime())) {
+        console.error('Invalid date:', dateStr);
+        return dateStr;
+      }
+      
+      // Format in IST timezone (Asia/Kolkata = UTC+5:30)
+      return date.toLocaleString('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+      });
+    } catch (e) {
+      console.error('Error formatting date:', e, 'Input:', dateStr);
+      return dateStr;
+    }
   };
 
   // RENDER: Tests View
@@ -308,29 +398,91 @@ const TestResults: React.FC = () => {
         </div>
 
         <div className="filters-bar">
-          <div className="search-box">
-            <span className="search-icon">🔍</span>
-            <input
-              type="text"
-              placeholder="Search by name or user ID..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
+          <div className="filters-row">
+            <div className="search-box">
+              <span className="search-icon">🔍</span>
+              <input
+                type="text"
+                placeholder="Search by name or user ID..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+
+            <div className="filter-group">
+              <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as any)}>
+                <option value="all">All Status</option>
+                <option value="passed">Passed</option>
+                <option value="failed">Failed</option>
+              </select>
+
+              <select value={sortBy} onChange={(e) => setSortBy(e.target.value as any)}>
+                <option value="score-high">Highest Score</option>
+                <option value="score-low">Lowest Score</option>
+                <option value="name">Name (A-Z)</option>
+                <option value="date">Most Recent</option>
+              </select>
+            </div>
+
+            <div className="export-group">
+              <button className="export-btn" onClick={exportToCSV} disabled={filteredResults.length === 0}>
+                ⬇ Export Filtered ({filteredResults.length})
+              </button>
+              <button className="export-btn export-btn-all" onClick={exportAllToCSV} disabled={userResults.length === 0}>
+                ⬇ Export All ({userResults.length})
+              </button>
+            </div>
           </div>
 
-          <div className="filter-group">
-            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as any)}>
-              <option value="all">All Status</option>
-              <option value="passed">Passed</option>
-              <option value="failed">Failed</option>
-            </select>
-
-            <select value={sortBy} onChange={(e) => setSortBy(e.target.value as any)}>
-              <option value="score-high">Highest Score</option>
-              <option value="score-low">Lowest Score</option>
-              <option value="name">Name (A-Z)</option>
-              <option value="date">Most Recent</option>
-            </select>
+          <div className="percent-filter-row">
+            <span className="percent-filter-label">Score Range:</span>
+            <div className="percent-inputs">
+              <div className="percent-input-group">
+                <label>Min %</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={maxPercent}
+                  value={minPercent}
+                  onChange={(e) => setMinPercent(Math.max(0, Math.min(Number(e.target.value), maxPercent)))}
+                />
+              </div>
+              <div className="percent-range-track">
+                <div
+                  className="percent-range-fill"
+                  style={{ left: `${minPercent}%`, width: `${maxPercent - minPercent}%` }}
+                />
+                <input
+                  type="range"
+                  min={0} max={100}
+                  value={minPercent}
+                  onChange={(e) => setMinPercent(Math.min(Number(e.target.value), maxPercent - 1))}
+                  className="range-thumb range-thumb-left"
+                />
+                <input
+                  type="range"
+                  min={0} max={100}
+                  value={maxPercent}
+                  onChange={(e) => setMaxPercent(Math.max(Number(e.target.value), minPercent + 1))}
+                  className="range-thumb range-thumb-right"
+                />
+              </div>
+              <div className="percent-input-group">
+                <label>Max %</label>
+                <input
+                  type="number"
+                  min={minPercent}
+                  max={100}
+                  value={maxPercent}
+                  onChange={(e) => setMaxPercent(Math.min(100, Math.max(Number(e.target.value), minPercent)))}
+                />
+              </div>
+            </div>
+            {(minPercent > 0 || maxPercent < 100) && (
+              <button className="reset-range-btn" onClick={() => { setMinPercent(0); setMaxPercent(100); }}>
+                ✕ Reset
+              </button>
+            )}
           </div>
         </div>
 
@@ -367,7 +519,6 @@ const TestResults: React.FC = () => {
                 <span className={`status-badge ${user.passed ? 'passed' : 'failed'}`}>
                   {user.passed ? '✓ Passed' : '✗ Failed'}
                 </span>
-                <span className="percentile">Top {100 - user.percentile}%</span>
               </div>
 
               <div className="user-meta">
@@ -433,15 +584,11 @@ const TestResults: React.FC = () => {
               </span>
             </div>
             <div className="stat-box">
-              <span className="stat-label">Percentile</span>
-              <span className="stat-value">{detailedResult.percentile}th</span>
-            </div>
-            <div className="stat-box">
               <span className="stat-label">Time Spent</span>
               <span className="stat-value">{formatTime(detailedResult.timeSpentSec)}</span>
             </div>
             <div className="stat-box">
-              <span className="stat-label">Submitted</span>
+              <span className="stat-label">Submitted (IST)</span>
               <span className="stat-value">{formatDate(detailedResult.submittedAt)}</span>
             </div>
           </div>

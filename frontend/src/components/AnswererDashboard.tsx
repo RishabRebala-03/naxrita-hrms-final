@@ -2,8 +2,21 @@ import React, { useEffect, useMemo, useState } from "react";
 import TestInterface from "./TestInterface";
 import "./AnswererDashboard.css";
 import { apiGet, apiPost } from "../services/api";
+import { useNavigate, useLocation } from "react-router-dom";
 
 type AnswererView = "dashboard" | "tests" | "history";
+
+const viewToPath: Record<AnswererView, string> = {
+  'dashboard': '/dashboard',
+  'tests':     '/dashboard/tests',
+  'history':   '/dashboard/history',
+};
+
+const pathToView: Record<string, AnswererView> = {
+  '/dashboard':         'dashboard',
+  '/dashboard/tests':   'tests',
+  '/dashboard/history': 'history',
+};
 
 interface Props {
   userName: string; // NOTE: you are passing userId into this currently
@@ -27,6 +40,7 @@ interface AssignedTest {
 
   totalMarks?: number;
   passingPercentage?: number;
+  attempted?: boolean;
 }
 
 interface ExamForTaking {
@@ -49,7 +63,10 @@ interface TestHistoryItem {
 }
 
 const AnswererDashboard: React.FC<Props> = ({ userName, onLogout }) => {
-const [activeView, setActiveView] = useState<AnswererView>("dashboard");
+const navigate = useNavigate();
+const location = useLocation();
+const activeView: AnswererView = pathToView[location.pathname] ?? 'dashboard';
+const setActiveView = (view: AnswererView) => navigate(viewToPath[view]);
 
   const [insights, setInsights] = useState<Insights>({
     testsTaken: 0,
@@ -141,7 +158,7 @@ const [activeView, setActiveView] = useState<AnswererView>("dashboard");
         `/answerer/tests/${examId}?userId=${encodeURIComponent(userName)}`
       );
       setActiveExam(res.test);
-      setActiveView("tests");
+      navigate('/dashboard/tests');
     } catch (e) {
       console.error(e);
       alert("Failed to start test");
@@ -152,8 +169,7 @@ const [activeView, setActiveView] = useState<AnswererView>("dashboard");
 
   const exitExam = () => {
     setActiveExam(null);
-    setActiveView("dashboard");
-    // refresh insights after a submission
+    navigate('/dashboard');
     loadInsights();
     loadAssignedTests();
     loadTestHistory();
@@ -343,7 +359,10 @@ const [activeView, setActiveView] = useState<AnswererView>("dashboard");
                       No upcoming tests
                     </p>
                   )}
-                  {assignedTests.slice(0, 3).map((test) => (
+                  {assignedTests
+                    .filter(t => !t.attempted)
+                    .slice(0, 3)
+                    .map((test) => (
                     <div key={test.id} className="test-row">
                       <div>
                         <div className="test-name">{test.name}</div>
@@ -469,14 +488,32 @@ const [activeView, setActiveView] = useState<AnswererView>("dashboard");
                         </div>
 
                         <div className="test-card-right">
-                          <button
-                            className="primary-btn large"
-                            disabled={loadingExam}
-                            onClick={() => startExam(t.id)}
-                          >
-                            {loadingExam ? "Starting..." : "Start Test"}
-                          </button>
+                          <div className="test-action-stack">
+                            <button
+                              className="primary-btn large"
+                              disabled={loadingExam || t.attempted}
+                              onClick={() => startExam(t.id)}
+                              title={
+                                t.attempted
+                                  ? "You have already attempted this test"
+                                  : "Start Test"
+                              }
+                            >
+                              {t.attempted
+                                ? "Test Already Attempted"
+                                : loadingExam
+                                  ? "Starting..."
+                                  : "Start Test"}
+                            </button>
+
+                            {t.attempted && (
+                              <div className="attempted-hint">
+                                You have already submitted this test.
+                              </div>
+                            )}
+                          </div>
                         </div>
+
                       </div>
 
                       <div className="test-card-footer">

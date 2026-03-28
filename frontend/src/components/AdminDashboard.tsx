@@ -4,10 +4,32 @@ import TestBuilder from './TestBuilder';
 import TestEditor from './TestEditor';
 import TestList from './TestList';
 import TestResults from './TestResults';
+import DataMaintenance from './DataMaintenance';
 import './AdminDashboard.css';
 import { apiGet } from '../services/api';
+import { useNavigate, useLocation } from 'react-router-dom';
 
-type AdminView = 'dashboard' | 'users' | 'create-test' | 'edit-test' | 'tests' | 'results';
+type AdminView = 'dashboard' | 'users' | 'create-test' | 'edit-test' | 'tests' | 'results' | 'data-maintenance';
+
+const viewToPath: Record<AdminView, string> = {
+  'dashboard':        '/admin',
+  'users':            '/admin/users',
+  'tests':            '/admin/tests',
+  'create-test':      '/admin/tests/create',
+  'edit-test':        '/admin/tests/edit',
+  'results':          '/admin/results',
+  'data-maintenance': '/admin/data-maintenance',
+};
+
+const pathToView: Record<string, AdminView> = {
+  '/admin':                   'dashboard',
+  '/admin/users':             'users',
+  '/admin/tests':             'tests',
+  '/admin/tests/create':      'create-test',
+  '/admin/tests/edit':        'edit-test',
+  '/admin/results':           'results',
+  '/admin/data-maintenance':  'data-maintenance',
+};
 
 interface AdminDashboardProps {
   adminName: string;
@@ -21,7 +43,10 @@ interface DashboardStats {
 }
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ adminName, onLogout }) => {
-  const [currentView, setCurrentView] = useState<AdminView>('dashboard');
+  const navigate = useNavigate();
+  const location = useLocation();
+  const currentView: AdminView = pathToView[location.pathname] ?? 'dashboard';
+  const setCurrentView = (view: AdminView) => navigate(viewToPath[view]);
   const [editingTestId, setEditingTestId] = useState<string | null>(null);
   const [stats, setStats] = useState<DashboardStats>({
     totalUsers: 0,
@@ -40,7 +65,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ adminName, onLogout }) 
     if (currentView === 'dashboard') {
       loadStats();
     }
-  }, [currentView]);
+  }, [location.pathname]);
 
   const loadStats = async () => {
     try {
@@ -75,6 +100,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ adminName, onLogout }) 
         return <TestList onCreateNew={() => setCurrentView('create-test')} onEditTest={handleEditTest} />;
       case 'results':
         return <TestResults />;
+      case 'data-maintenance':
+        return <DataMaintenance />;
       default:
         return (
           <>
@@ -90,7 +117,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ adminName, onLogout }) 
             <div className="dashboard-home">
               <h2>Welcome, {adminName} 👋</h2>
               <p className="subtitle">Manage tests, users, and monitor system performance</p>
-              
+
               <div className="stats-grid">
                 <div className="stat-card">
                   <div className="stat-icon">👥</div>
@@ -160,6 +187,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ adminName, onLogout }) 
           >
             <span className="nav-icon">📈</span>
             Test Results
+          </button>
+          <button
+            className={`nav-item ${currentView === 'data-maintenance' ? 'active' : ''}`}
+            onClick={() => setCurrentView('data-maintenance')}
+          >
+            <span className="nav-icon">🗂️</span>
+            Data Maintenance
           </button>
         </nav>
         <div className="sidebar-footer">

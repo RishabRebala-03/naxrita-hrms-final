@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import './Login.css';
 import { apiPost } from "../services/api";
+import StudentRegistration from './StudentRegistration';
 
 type UserRole = 'admin' | 'answerer';
 
@@ -13,11 +14,11 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [userId, setUserId] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showRegister, setShowRegister] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userId || !password) return;
-
     setIsLoading(true);
     try {
       const res = await apiPost<{ user: any }>("/auth/login", {
@@ -25,14 +26,27 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         password,
         role: selectedRole,
       });
-
       onLogin(res.user.role, res.user.userId);
-    } catch (err) {
-      alert("Invalid credentials");
+    }catch (err: any) {
+      const msg: string = err?.message || err?.error || "";
+      if (msg.toLowerCase().includes("inactive")) {
+        alert("⚠️ Account Inactive\n\nYour account has been deactivated. Please contact your administrator to regain access.");
+      } else {
+        alert("Invalid credentials. Please check your User ID and password.");
+      }
     } finally {
       setIsLoading(false);
     }
   };
+
+  if (showRegister) {
+    return (
+      <StudentRegistration
+        onBack={() => setShowRegister(false)}
+        onSuccess={() => setShowRegister(false)}
+      />
+    );
+  }
 
   return (
     <div className="login-container">
@@ -86,7 +100,6 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
               autoComplete="username"
             />
           </div>
-
           <div className="form-group">
             <label htmlFor="password">Password</label>
             <input
@@ -99,7 +112,6 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
               autoComplete="current-password"
             />
           </div>
-
           <button type="submit" className="submit-btn" disabled={isLoading}>
             {isLoading ? 'Signing in...' : 'Sign In'}
           </button>
@@ -111,9 +123,22 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           <span>Secure authentication</span>
         </div>
 
-        {/* Footer */}
+        {/* Footer — Register link only shown for Test Taker role */}
         <div className="login-footer">
-          <p>Need help? <a href="#support">Contact support</a></p>
+          {selectedRole === 'answerer' ? (
+            <p>
+              New student?{' '}
+              <button
+                className="login-register-link"
+                onClick={() => setShowRegister(true)}
+                type="button"
+              >
+                Register here
+              </button>
+            </p>
+          ) : (
+            <p>Need help? <a href="#support">Contact support</a></p>
+          )}
         </div>
       </div>
     </div>

@@ -21,10 +21,10 @@ def list_exams():
             "duration": int(e.get("duration", 0)),
             "questions": int(e.get("questionCount", 0)),
             "sections": e.get("sections", []),
+            "passingPercentage": int(e.get("passingPercentage", 40)),
             "createdAt": e.get("createdAt").isoformat() if e.get("createdAt") else None,
             "status": e.get("status", "draft"),
         })
-    # newest first
     out.sort(key=lambda x: x.get("createdAt") or "", reverse=True)
     return jsonify({"tests": to_jsonable(out)})
 
@@ -34,22 +34,13 @@ def list_exams():
 def create_exam():
     """Create exam + questions.
 
-    Payload (matches TestBuilder output):
+    Payload:
     {
       "testName": "...",
       "duration": 60,
+      "passingPercentage": 40,
       "sections": ["General"],
-      "questions": [
-        {
-          "id": "...",
-          "type": "mcq"|"multiple"|"text",
-          "question": "...",
-          "options": [...],
-          "correctAnswer": "..."|[...],
-          "section": "General",
-          "marks": 1
-        }
-      ]
+      "questions": [...]
     }
     """
     payload = request.get_json(silent=True) or {}
@@ -61,17 +52,20 @@ def create_exam():
 
     testName = str(payload["testName"]).strip()
     duration = int(payload["duration"])
+    passing_percentage = int(payload.get("passingPercentage", 40))
+    if not (1 <= passing_percentage <= 100):
+        return jsonify({"error": "passingPercentage must be between 1 and 100"}), 400
+
     sections_input = payload.get("sections") or []
     questions = payload.get("questions") or []
 
-    # Extract section names if sections is array of objects
     sections = []
     for s in sections_input:
         if isinstance(s, dict):
             sections.append(s.get("name", ""))
         else:
             sections.append(str(s))
-    sections = [s for s in sections if s]  # Remove empty strings
+    sections = [s for s in sections if s]
 
     if not isinstance(sections, list) or len(sections) == 0:
         return jsonify({"error": "sections must be a non-empty list"}), 400
@@ -83,6 +77,7 @@ def create_exam():
     exam_doc = {
         "name": testName,
         "duration": duration,
+        "passingPercentage": passing_percentage,
         "sections": sections,
         "status": "active",
         "questionCount": len(questions),
@@ -95,7 +90,6 @@ def create_exam():
 
     q_docs = []
     for q in questions:
-        # minimal validation
         if not q.get("type") or not q.get("question") or not q.get("section"):
             continue
         q_docs.append({
@@ -121,6 +115,7 @@ def create_exam():
             "id": str(exam_id),
             "name": exam_doc["name"],
             "duration": exam_doc["duration"],
+            "passingPercentage": exam_doc["passingPercentage"],
             "questions": exam_doc["questionCount"],
             "sections": exam_doc["sections"],
             "createdAt": exam_doc["createdAt"].isoformat(),
@@ -162,6 +157,7 @@ def get_exam(exam_id: str):
             "id": str(exam["_id"]),
             "testName": exam.get("name"),
             "duration": int(exam.get("duration", 0)),
+            "passingPercentage": int(exam.get("passingPercentage", 40)),
             "sections": exam.get("sections", []),
             "status": exam.get("status", "draft"),
             "questions": out_questions,
@@ -174,10 +170,6 @@ def get_exam(exam_id: str):
 @admin_exams_bp.route("/<exam_id>", methods=["PUT"])
 @admin_exams_bp.route("/<exam_id>/", methods=["PUT"])
 def update_exam(exam_id: str):
-    """Update exam metadata and replace all questions.
-
-    Payload same as create_exam.
-    """
     payload = request.get_json(silent=True) or {}
     ok, msg = require_fields(payload, ["testName", "duration", "sections", "questions"])
     if not ok:
@@ -193,21 +185,25 @@ def update_exam(exam_id: str):
     if not exam:
         return jsonify({"error": "Exam not found"}), 404
 
+    passing_percentage = int(payload.get("passingPercentage", 40))
+    if not (1 <= passing_percentage <= 100):
+        return jsonify({"error": "passingPercentage must be between 1 and 100"}), 400
+
     now = datetime.utcnow()
     sections_input = payload.get("sections") or []
 
-    # Extract section names if sections is array of objects
     sections = []
     for s in sections_input:
         if isinstance(s, dict):
             sections.append(s.get("name", ""))
         else:
             sections.append(str(s))
-    sections = [s for s in sections if s]  # Remove empty strings
+    sections = [s for s in sections if s]
 
     update = {
         "name": str(payload["testName"]).strip(),
         "duration": int(payload["duration"]),
+        "passingPercentage": passing_percentage,
         "sections": sections,
         "questionCount": len(payload.get("questions") or []),
         "updatedAt": now,
@@ -215,7 +211,6 @@ def update_exam(exam_id: str):
 
     db.exams.update_one({"_id": oid}, {"$set": update})
 
-    # Replace questions
     db.questions.delete_many({"examId": oid})
     q_docs = []
     for q in payload.get("questions") or []:
@@ -261,7 +256,6 @@ def delete_exam(exam_id: str):
 @admin_exams_bp.route("/<exam_id>/publish", methods=["POST"])
 @admin_exams_bp.route("/<exam_id>/publish/", methods=["POST"])
 def publish_exam(exam_id: str):
-    """Mark exam as active."""
     db = get_db()
     try:
         oid = ObjectId(exam_id)
@@ -277,11 +271,6 @@ def publish_exam(exam_id: str):
 @admin_exams_bp.route("/<exam_id>/assign", methods=["POST"])
 @admin_exams_bp.route("/<exam_id>/assign/", methods=["POST"])
 def assign_exam(exam_id: str):
-    """Assign an exam to one or more users.
-
-    Payload:
-    {"userIds": ["EMP001", "EMP002"]}
-    """
     payload = request.get_json(silent=True) or {}
     ok, msg = require_fields(payload, ["userIds"])
     if not ok:

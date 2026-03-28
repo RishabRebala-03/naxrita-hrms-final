@@ -22,7 +22,6 @@ interface BackendResult {
   scoredMarks: number;
   percentage: number;
   passed: boolean;
-  percentile: number;
   sectionWise: Record<string, { total: number; scored: number }>;
   questionReview: Array<{
     questionId: string;
@@ -77,8 +76,7 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
       totalMarks,
       scoredMarks,
       percentage,
-      passed: percentage >= 40,
-      percentile: 0,
+      passed: percentage >= 80,
       sectionWise,
       questionReview: [],
     };
@@ -139,10 +137,6 @@ const ResultsPage: React.FC<ResultsPageProps> = ({
           <div className="stat-box">
             <span className="stat-label">Percentage</span>
             <span className="stat-value">{safePercentage.toFixed(2)}%</span>
-          </div>
-          <div className="stat-box">
-            <span className="stat-label">Percentile</span>
-            <span className="stat-value">{results.percentile}th</span>
           </div>
         </div>
 

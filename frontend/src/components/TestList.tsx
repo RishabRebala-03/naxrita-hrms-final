@@ -282,7 +282,7 @@ const TestList: React.FC<TestListProps> = ({ onCreateNew, onEditTest }) => {
                 <p style={{ color: "#6a6d70" }}>No users available</p>
               )}
 
-              {/* ========== ADD THIS SELECT ALL SECTION HERE ========== */}
+              {/* Select All Section */}
               {allUsers.length > 0 && (
                 <div style={{
                   marginBottom: "1rem",
@@ -322,35 +322,33 @@ const TestList: React.FC<TestListProps> = ({ onCreateNew, onEditTest }) => {
                   </label>
                 </div>
               )}
-              {/* ========== END SELECT ALL SECTION ========== */}
 
-              {allUsers.map((user) => (
-                <label
-                  key={user.userId}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    marginBottom: "0.75rem",
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedUserIds.includes(user.userId)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedUserIds((prev) => [...prev, user.userId]);
-                      } else {
-                        setSelectedUserIds((prev) =>
-                          prev.filter((id) => id !== user.userId)
-                        );
-                      }
-                    }}
-                  />
-                  <span style={{ marginLeft: "0.5rem" }}>
-                    {user.name} ({user.userId})
-                  </span>
-                </label>
-              ))}
+              {/* User List */}
+              <div className="assign-user-list">
+                {allUsers.map((user) => (
+                  <label
+                    key={user.userId}
+                    className="assign-user-row"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedUserIds.includes(user.userId)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedUserIds((prev) => [...prev, user.userId]);
+                        } else {
+                          setSelectedUserIds((prev) =>
+                            prev.filter((id) => id !== user.userId)
+                          );
+                        }
+                      }}
+                    />
+                    <span style={{ marginLeft: "0.5rem" }}>
+                      {user.name} ({user.userId})
+                    </span>
+                  </label>
+                ))}
+              </div>
             </div>
 
             <div className="modal-footer">

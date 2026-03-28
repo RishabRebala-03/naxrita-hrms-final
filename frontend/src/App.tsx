@@ -1,48 +1,77 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import Login from './components/Login';
 import AdminDashboard from './components/AdminDashboard';
-import TestInterface from './components/TestInterface';
-import { sampleTest } from './components/sampleTestData';
 import AnswererDashboard from './components/AnswererDashboard';
 import './App.css';
 
 type UserRole = 'admin' | 'answerer';
 
 function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentRole, setCurrentRole] = useState<UserRole | null>(null);
   const [currentUser, setCurrentUser] = useState<string>('');
+  const navigate = useNavigate();
+
+  // Restore session on refresh
+  useEffect(() => {
+    const savedRole = sessionStorage.getItem('role') as UserRole | null;
+    const savedUser = sessionStorage.getItem('userId');
+    if (savedRole && savedUser) {
+      setCurrentRole(savedRole);
+      setCurrentUser(savedUser);
+    }
+  }, []);
 
   const handleLogin = (role: UserRole, userId: string) => {
+    sessionStorage.setItem('role', role);
+    sessionStorage.setItem('userId', userId);
     setCurrentRole(role);
     setCurrentUser(userId);
-    setIsLoggedIn(true);
+    navigate(role === 'admin' ? '/admin' : '/dashboard');
   };
 
   const handleLogout = () => {
-    setIsLoggedIn(false);
+    sessionStorage.clear();
     setCurrentRole(null);
     setCurrentUser('');
+    navigate('/login');
   };
 
-  const handleTestSubmit = () => {
-    console.log('Test submitted!');
-  };
+  const isLoggedIn = !!currentRole && !!currentUser;
 
-  if (!isLoggedIn) {
-    return <Login onLogin={handleLogin} />;
-  }
-
-  if (currentRole === 'admin') {
-    return <AdminDashboard adminName={currentUser} onLogout={handleLogout} />;
-  }
-
-  // Test taker interface
   return (
-    <AnswererDashboard
-      userName={currentUser}
-      onLogout={handleLogout}
-    />
+    <Routes>
+      <Route
+        path="/login"
+        element={
+          isLoggedIn
+            ? <Navigate to={currentRole === 'admin' ? '/admin' : '/dashboard'} replace />
+            : <Login onLogin={handleLogin} />
+        }
+      />
+      <Route
+        path="/admin/*"
+        element={
+          isLoggedIn && currentRole === 'admin'
+            ? <AdminDashboard adminName={currentUser} onLogout={handleLogout} />
+            : <Navigate to="/login" replace />
+        }
+      />
+      <Route
+        path="/dashboard/*"
+        element={
+          isLoggedIn && currentRole === 'answerer'
+            ? <AnswererDashboard userName={currentUser} onLogout={handleLogout} />
+            : <Navigate to="/login" replace />
+        }
+      />
+      <Route
+        path="*"
+        element={
+          <Navigate to={isLoggedIn ? (currentRole === 'admin' ? '/admin' : '/dashboard') : '/login'} replace />
+        }
+      />
+    </Routes>
   );
 }
 

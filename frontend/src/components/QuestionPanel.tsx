@@ -42,17 +42,16 @@ const QuestionPanel: React.FC<QuestionPanelProps> = ({
   return (
     <div className="question-panel">
       <div className="question-header">
-  <span className="question-number">
-    {questionNumber}.
-  </span>
-  <p className="question-text">
-    {question.question}
-  </p>
-</div>
-
+        <span className="question-number">
+          {questionNumber}.
+        </span>
+        <p className="question-text prewrap">
+          {question.question}
+        </p>
+      </div>
 
       {question.type === 'multiple' && (
-        <p className="note-text">Note: There are {question.options?.length || 0} correct answers to this question.</p>
+        <p className="note-text">Note: There are multiple correct answers to this question.</p>
       )}
 
       {question.type === 'mcq' && question.options && (
