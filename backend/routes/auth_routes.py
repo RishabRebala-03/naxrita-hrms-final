@@ -6,6 +6,17 @@ from utils.validators import require_fields
 
 auth_bp = Blueprint("auth", __name__)
 
+
+def get_profile_image(user: dict):
+    return (
+        user.get("profileImage")
+        or user.get("profilePicture")
+        or user.get("avatar")
+        or user.get("photo")
+        or user.get("photoUrl")
+        or user.get("imageUrl")
+    )
+
 @auth_bp.post("/login")
 def login():
     """Login using userId (or naxUnid) + password + role."""
@@ -42,6 +53,7 @@ def login():
         "name":   user.get("name"),
         "email":  user.get("email"),
         "role":   user.get("role"),
+        "profileImage": get_profile_image(user),
     }
     return jsonify({"user": to_jsonable(res_user)})
 

@@ -3,6 +3,7 @@ import TestInterface from "./TestInterface";
 import "./AnswererDashboard.css";
 import { apiGet, apiPost } from "../services/api";
 import { useNavigate, useLocation } from "react-router-dom";
+import { getInitials, resolveAvatarSrc } from "../utils/avatar";
 
 type AnswererView = "dashboard" | "tests" | "history";
 
@@ -62,11 +63,19 @@ interface TestHistoryItem {
   timeSpentSec: number;
 }
 
+interface AnswererProfile {
+  userId: string;
+  name?: string;
+  email?: string;
+  profileImage?: string;
+}
+
 const AnswererDashboard: React.FC<Props> = ({ userName, onLogout }) => {
 const navigate = useNavigate();
 const location = useLocation();
 const activeView: AnswererView = pathToView[location.pathname] ?? 'dashboard';
 const setActiveView = (view: AnswererView) => navigate(viewToPath[view]);
+const currentUserId = userName;
 
   const [insights, setInsights] = useState<Insights>({
     testsTaken: 0,
@@ -89,7 +98,8 @@ const setActiveView = (view: AnswererView) => navigate(viewToPath[view]);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [changingPassword, setChangingPassword] = useState(false);
-
+  const [profile, setProfile] = useState<AnswererProfile>({ userId: currentUserId });
+  const [avatarBroken, setAvatarBroken] = useState(false);
 
   const today = useMemo(
     () =>
@@ -105,7 +115,7 @@ const setActiveView = (view: AnswererView) => navigate(viewToPath[view]);
   const loadInsights = async () => {
     try {
       const res = await apiGet<{ insights: Insights }>(
-        `/answerer/dashboard?userId=${encodeURIComponent(userName)}`
+        `/answerer/dashboard?userId=${encodeURIComponent(currentUserId)}`
       );
       setInsights(res.insights);
     } catch (e) {
@@ -118,7 +128,7 @@ const setActiveView = (view: AnswererView) => navigate(viewToPath[view]);
     setLoadingTests(true);
     try {
       const res = await apiGet<{ tests: AssignedTest[] }>(
-        `/answerer/tests?userId=${encodeURIComponent(userName)}`
+        `/answerer/tests?userId=${encodeURIComponent(currentUserId)}`
       );
       setAssignedTests(res.tests || []);
     } catch (e) {
@@ -134,7 +144,7 @@ const setActiveView = (view: AnswererView) => navigate(viewToPath[view]);
     setLoadingHistory(true);
     try {
       const res = await apiGet<{ history: TestHistoryItem[] }>(
-        `/answerer/history?userId=${encodeURIComponent(userName)}`
+        `/answerer/history?userId=${encodeURIComponent(currentUserId)}`
       );
       setTestHistory(res.history || []);
     } catch (e) {
@@ -145,17 +155,31 @@ const setActiveView = (view: AnswererView) => navigate(viewToPath[view]);
     }
   };
 
+  const loadProfile = async () => {
+    try {
+      const res = await apiGet<{ user: AnswererProfile }>(
+        `/answerer/profile?userId=${encodeURIComponent(currentUserId)}`
+      );
+      setProfile(res.user || { userId: currentUserId });
+      setAvatarBroken(false);
+    } catch (e) {
+      console.error(e);
+      setProfile({ userId: currentUserId });
+    }
+  };
+
   useEffect(() => {
+    loadProfile();
     loadInsights();
     loadAssignedTests();
     loadTestHistory();
-  }, [userName]);
+  }, [currentUserId]);
 
   const startExam = async (examId: string) => {
     setLoadingExam(true);
     try {
       const res = await apiGet<{ test: ExamForTaking }>(
-        `/answerer/tests/${examId}?userId=${encodeURIComponent(userName)}`
+        `/answerer/tests/${examId}?userId=${encodeURIComponent(currentUserId)}`
       );
       setActiveExam(res.test);
       navigate('/dashboard/tests');
@@ -193,6 +217,9 @@ const setActiveView = (view: AnswererView) => navigate(viewToPath[view]);
     const secs = seconds % 60;
     return `${mins}m ${secs}s`;
   };
+
+  const avatarSrc = avatarBroken ? "" : resolveAvatarSrc(profile.profileImage);
+  const displayName = profile.name || currentUserId;
 
   // Store the current view before entering test mode for proper highlighting
   const showSidebar = activeView !== "tests" || !activeExam;
@@ -240,9 +267,18 @@ const setActiveView = (view: AnswererView) => navigate(viewToPath[view]);
           <div className="sidebar-footer">
             <div className="user-profile">
               <div className="user-avatar">
-                {userName?.[0]?.toUpperCase() || "U"}
+                {avatarSrc ? (
+                  <img
+                    src={avatarSrc}
+                    alt={displayName}
+                    className="user-avatar-image"
+                    onError={() => setAvatarBroken(true)}
+                  />
+                ) : (
+                  getInitials(displayName)
+                )}
               </div>
-              <div className="user-name">{userName}</div>
+              <div className="user-name">{displayName}</div>
             </div>
 
             <button
@@ -270,7 +306,7 @@ const setActiveView = (view: AnswererView) => navigate(viewToPath[view]);
             </div>
 
             <div>
-              <h2>Welcome back, {userName} 👋</h2>
+              <h2>Welcome back, {displayName} 👋</h2>
               <p className="subtitle">Track your progress and manage your tests</p>
 
               <div className="stats-grid">
@@ -532,7 +568,7 @@ const setActiveView = (view: AnswererView) => navigate(viewToPath[view]);
               </>
             ) : (
               <TestInterface
-                userId={userName}
+                userId={currentUserId}
                 examId={activeExam.id}
                 testName={activeExam.testName}
                 duration={activeExam.duration}
@@ -606,7 +642,7 @@ const setActiveView = (view: AnswererView) => navigate(viewToPath[view]);
                   try {
                     setChangingPassword(true);
                     await apiPost("/auth/change-password", {
-                      userId: userName,
+                      userId: currentUserId,
                       role: "answerer",
                       oldPassword,
                       newPassword,

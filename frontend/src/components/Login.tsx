@@ -15,11 +15,13 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
+  const [loginError, setLoginError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userId || !password) return;
     setIsLoading(true);
+    setLoginError('');
     try {
       const res = await apiPost<{ user: any }>("/auth/login", {
         userId,
@@ -30,9 +32,9 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     }catch (err: any) {
       const msg: string = err?.message || err?.error || "";
       if (msg.toLowerCase().includes("inactive")) {
-        alert("⚠️ Account Inactive\n\nYour account has been deactivated. Please contact your administrator to regain access.");
+        setLoginError("Your account is inactive. Please contact your administrator to regain access.");
       } else {
-        alert("Invalid credentials. Please check your User ID and password.");
+        setLoginError("Invalid credentials. Please check your User ID and password.");
       }
     } finally {
       setIsLoading(false);
@@ -70,7 +72,10 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         <div className="role-selector">
           <button
             className={`role-btn ${selectedRole === 'answerer' ? 'active' : ''}`}
-            onClick={() => setSelectedRole('answerer')}
+            onClick={() => {
+              setSelectedRole('answerer');
+              setLoginError('');
+            }}
             type="button"
           >
             <span className="role-icon">👤</span>
@@ -78,7 +83,10 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           </button>
           <button
             className={`role-btn ${selectedRole === 'admin' ? 'active' : ''}`}
-            onClick={() => setSelectedRole('admin')}
+            onClick={() => {
+              setSelectedRole('admin');
+              setLoginError('');
+            }}
             type="button"
           >
             <span className="role-icon">⚙️</span>
@@ -88,13 +96,21 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
         {/* Login Form */}
         <form onSubmit={handleSubmit} className="login-form">
+          {loginError && (
+            <div className="login-error" role="alert">
+              {loginError}
+            </div>
+          )}
           <div className="form-group">
             <label htmlFor="userId">User ID</label>
             <input
               id="userId"
               type="text"
               value={userId}
-              onChange={(e) => setUserId(e.target.value)}
+              onChange={(e) => {
+                setUserId(e.target.value);
+                if (loginError) setLoginError('');
+              }}
               placeholder="Enter your user ID"
               required
               autoComplete="username"
@@ -106,7 +122,10 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
               id="password"
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                if (loginError) setLoginError('');
+              }}
               placeholder="Enter your password"
               required
               autoComplete="current-password"

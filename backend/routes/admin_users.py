@@ -8,6 +8,17 @@ from utils.validators import require_fields
 
 admin_users_bp = Blueprint("admin_users", __name__)
 
+
+def get_profile_image(user: dict):
+    return (
+        user.get("profileImage")
+        or user.get("profilePicture")
+        or user.get("avatar")
+        or user.get("photo")
+        or user.get("photoUrl")
+        or user.get("imageUrl")
+    )
+
 # =========================
 # LIST USERS
 # =========================
@@ -36,6 +47,7 @@ def list_users():
             "cgpa": u.get("cgpa"),
             "sapCertification": u.get("sapCertification"),
             "studentId": u.get("studentId"),
+            "profileImage": get_profile_image(u),
         })
     return jsonify({"users": to_jsonable(out)})
 
@@ -75,7 +87,8 @@ def create_user():
             "userId": doc["userId"],
             "role": doc["role"],
             "createdAt": doc["createdAt"],
-            "isActive": doc["isActive"], 
+            "isActive": doc["isActive"],
+            "profileImage": get_profile_image(doc),
         })
     }), 201
 
@@ -229,5 +242,6 @@ def update_user(user_id: str):
             "name","email","userId","role","createdAt","isActive",
             "naxUnid","mobile","gender","collegeName","collegeEmail",
             "collegeRollNumber","courseStream","cgpa","sapCertification","studentId"
-        ]}
+        ]},
+        "profileImage": get_profile_image(updated),
     })})

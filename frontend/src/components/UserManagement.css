@@ -256,6 +256,38 @@ td {
 }
 .um-name-cell:hover { color: #0057c2 !important; }
 
+.um-user-name-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.um-avatar,
+.profile-avatar-lg {
+  border-radius: 50%;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.um-avatar {
+  width: 2rem;
+  height: 2rem;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.avatar-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
 /* ──────────────────────────────────────────────────────────
    STICKY ACTIONS COLUMN
    Using explicit classes (not :last-child) so reordering
@@ -329,6 +361,51 @@ td {
 }
 .status-pill.active   { background: #d1fae5; color: #065f46; }
 .status-pill.inactive { background: #fee2e2; color: #991b1b; }
+
+.status-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.status-toggle-track {
+  width: 2.5rem;
+  height: 1.4rem;
+  border-radius: 999px;
+  padding: 0.12rem;
+  background: #cbd5e1;
+  display: inline-flex;
+  align-items: center;
+  transition: background 0.2s ease;
+}
+
+.status-toggle-thumb {
+  width: 1.15rem;
+  height: 1.15rem;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+  transition: transform 0.2s ease;
+}
+
+.status-toggle.on .status-toggle-track {
+  background: #16a34a;
+}
+
+.status-toggle.on .status-toggle-thumb {
+  transform: translateX(1.08rem);
+}
+
+.status-toggle-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #1d2d3e;
+}
 
 /* ── Empty state ── */
 .empty-state { text-align: center; padding: 3rem 1rem; color: #6a6d70; font-size: 0.875rem; }
@@ -423,9 +500,8 @@ td {
   background: linear-gradient(135deg, #ebf5ff 0%, #f7f9fb 100%);
 }
 .profile-avatar-lg {
-  width: 4.5rem; height: 4.5rem; border-radius: 50%;
+  width: 4.5rem; height: 4.5rem;
   background: #dbeafe; color: #1d4ed8; border: 2px solid #bfdbfe;
-  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
 .profile-header-info h2 { font-size: 1.375rem; font-weight: 500; color: #1d2d3e; margin: 0 0 0.25rem 0; }
 .profile-sub { font-size: 0.875rem; color: #6a6d70; margin: 0.1rem 0; }

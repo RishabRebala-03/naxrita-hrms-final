@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import "./UserManagement.css";
 import { apiGet, apiPost, apiDelete, apiPut } from "../services/api";
+import { getInitials, resolveAvatarSrc } from "../utils/avatar";
 
 // ─── SVG Icon Components ──────────────────────────────────────────────────────
 
@@ -148,6 +149,7 @@ interface User {
   naxUnid?: string;
   studentId?: string;
   status?: string;
+  profileImage?: string;
 }
 
 interface MasterItem { id: string; label: string; }
@@ -166,6 +168,43 @@ interface ColDef {
   sortable: boolean;
   render?: (u: User) => React.ReactNode;
 }
+
+const Avatar: React.FC<{ name: string; profileImage?: string; large?: boolean }> = ({ name, profileImage, large = false }) => {
+  const [failed, setFailed] = useState(false);
+  const src = failed ? "" : resolveAvatarSrc(profileImage);
+  const className = large ? "profile-avatar-lg" : "um-avatar";
+
+  return (
+    <div className={className}>
+      {src ? (
+        <img
+          src={src}
+          alt={name}
+          className="avatar-image"
+          onError={() => setFailed(true)}
+        />
+      ) : (
+        large ? <Icon.User /> : <span>{getInitials(name)}</span>
+      )}
+    </div>
+  );
+};
+
+const StatusToggle: React.FC<{ checked: boolean; onChange: () => void; label?: boolean }> = ({ checked, onChange, label = true }) => (
+  <button
+    type="button"
+    className={`status-toggle ${checked ? "on" : "off"}`}
+    onClick={onChange}
+    aria-pressed={checked}
+    aria-label={checked ? "Mark inactive" : "Mark active"}
+    title={checked ? "Mark inactive" : "Mark active"}
+  >
+    <span className="status-toggle-track">
+      <span className="status-toggle-thumb" />
+    </span>
+    {label && <span className="status-toggle-label">{checked ? "Active" : "Inactive"}</span>}
+  </button>
+);
 
 // ─── Column definitions ───────────────────────────────────────────────────────
 
@@ -478,12 +517,7 @@ const UserProfile: React.FC<{
           <button className="profile-action-btn edit" onClick={() => onEdit(user)}>
             <Icon.Edit /> Edit
           </button>
-          <button
-            className={`profile-action-btn ${user.isActive ? "deactivate" : "activate"}`}
-            onClick={() => onToggleActive(user)}
-          >
-            {user.isActive ? <><Icon.Ban /> Deactivate</> : <><Icon.CheckCircle /> Activate</>}
-          </button>
+          <StatusToggle checked={user.isActive} onChange={() => onToggleActive(user)} />
           <button className="profile-action-btn pwd" onClick={() => onChangePassword(user)}>
             <Icon.Key /> Change Password
           </button>
@@ -495,7 +529,7 @@ const UserProfile: React.FC<{
 
       <div className="profile-card">
         <div className="profile-header">
-          <div className="profile-avatar-lg"><Icon.User /></div>
+          <Avatar name={user.name} profileImage={user.profileImage} large />
           <div className="profile-header-info">
             <h2>{user.name}</h2>
             <p className="profile-sub">{user.naxUnid || user.userId}</p>
@@ -1006,7 +1040,16 @@ const UserManagement: React.FC = () => {
                       onClick={col.key === "name" ? () => setProfileUser(user) : undefined}
                       title={col.key === "name" ? "Click to view profile" : undefined}
                     >
-                      {col.render
+                      {col.key === "isActive"
+                        ? <StatusToggle checked={user.isActive} onChange={() => handleToggleActive(user)} />
+                        : col.key === "name"
+                        ? (
+                          <span className="um-user-name-wrap">
+                            <Avatar name={user.name} profileImage={user.profileImage} />
+                            <span>{user.name}</span>
+                          </span>
+                        )
+                        : col.render
                         ? col.render(user)
                         : col.key === "cgpa"
                         ? (user.cgpa != null ? user.cgpa.toFixed(2) : "—")

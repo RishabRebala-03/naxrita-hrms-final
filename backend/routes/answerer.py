@@ -9,6 +9,44 @@ from services.scoring import compute_result
 
 answerer_bp = Blueprint("answerer", __name__)
 
+
+def get_profile_image(user: dict):
+    return (
+        user.get("profileImage")
+        or user.get("profilePicture")
+        or user.get("avatar")
+        or user.get("photo")
+        or user.get("photoUrl")
+        or user.get("imageUrl")
+    )
+
+
+@answerer_bp.get("/profile")
+def get_profile():
+    userId = (request.args.get("userId") or "").strip()
+    if not userId:
+        return jsonify({"error": "userId is required"}), 400
+
+    db = get_db()
+    user = db.users.find_one(
+        {"$or": [{"userId": userId}, {"naxUnid": userId}], "role": "answerer"},
+        {"password": 0},
+    )
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    return jsonify({
+        "user": to_jsonable({
+            "id": str(user["_id"]),
+            "userId": user.get("userId"),
+            "naxUnid": user.get("naxUnid"),
+            "name": user.get("name"),
+            "email": user.get("email"),
+            "isActive": user.get("isActive", True),
+            "profileImage": get_profile_image(user),
+        })
+    })
+
 @answerer_bp.get("/dashboard")
 def dashboard():
     """Return answerer insights.
